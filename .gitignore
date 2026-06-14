@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+backend/venv/
+env/
+
+# Django
+*.log
+local_settings.py
+backend/db.sqlite3
+backend/db.sqlite3-journal
+backend/static/
+backend/media/
+backend/django.log
+
+# Environment / secrets — never commit
+.env
+.env.*
+!.env.example
+!**/.env.example
+backend/.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Node / React (when frontend is added)
+node_modules/
+frontend/dist/
+frontend/build/
+.vercel/
+
+# Testing / coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# OS
+Thumbs.db
