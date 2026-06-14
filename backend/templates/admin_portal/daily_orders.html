@@ -1,0 +1,74 @@
+{% extends 'admin_portal/base.html' %}
+{% block title %}Today's Orders{% endblock %}
+{% block page_title %}Kitchen Order Report{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3>{{ report_date|date:"l, d F Y" }}</h3>
+    <p style="color:#718096; font-size:0.9rem; margin-bottom:16px;">
+        Quantities needed for kitchen preparation. <strong>No user names</strong> — totals only.
+    </p>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:16px; margin-bottom:24px;">
+        <div style="background:#ebf8ff; padding:20px; border-radius:10px; text-align:center;">
+            <div style="font-size:2rem; font-weight:700; color:#2b6cb0;">{{ totals.total_users }}</div>
+            <div style="font-size:0.8rem; color:#4a5568; margin-top:4px;">Users ordered</div>
+        </div>
+        <div style="background:#f0fff4; padding:20px; border-radius:10px; text-align:center;">
+            <div style="font-size:2rem; font-weight:700; color:#276749;">{{ totals.total_items }}</div>
+            <div style="font-size:0.8rem; color:#4a5568; margin-top:4px;">Total items</div>
+        </div>
+        <div style="background:#faf5ff; padding:20px; border-radius:10px; text-align:center;">
+            <div style="font-size:2rem; font-weight:700; color:#553c9a;">{{ totals.items|length }}</div>
+            <div style="font-size:0.8rem; color:#4a5568; margin-top:4px;">Menu items ordered</div>
+        </div>
+    </div>
+
+    {% if totals.items %}
+    <table>
+        <thead>
+            <tr>
+                <th>Item</th>
+                <th>Category</th>
+                <th style="text-align:right;">Quantity needed</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in totals.items %}
+            <tr>
+                <td><strong>{{ row.item_name }}</strong></td>
+                <td>{{ row.item_category|title }}</td>
+                <td style="text-align:right; font-size:1.25rem; font-weight:700; color:#2d3748;">{{ row.total_quantity }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td colspan="2"><strong>Total</strong></td>
+                <td style="text-align:right; font-weight:700;">{{ totals.total_items }}</td>
+            </tr>
+        </tfoot>
+    </table>
+    {% else %}
+    <div class="empty" style="text-align:center; padding:32px;">
+        <p style="font-size:1.1rem;">No orders yet for this date.</p>
+        <p style="margin-top:8px;">Orders will appear here when users place them from today's menu.</p>
+    </div>
+    {% endif %}
+</div>
+
+{% if daily_menu %}
+<div class="card">
+    <h3>Menu status</h3>
+    <p>
+        <span class="badge badge-{{ daily_menu.status }}">{{ daily_menu.get_status_display }}</span>
+        {% if daily_menu.cutoff_time %}
+        <span style="color:#718096; font-size:0.85rem; margin-left:8px;">Cutoff: {{ daily_menu.cutoff_time|time:"H:i" }}</span>
+        {% endif %}
+    </p>
+    <a href="{% url 'admin_edit_daily' report_date.year report_date.month report_date.day %}" class="btn btn-secondary btn-sm" style="margin-top:12px;">Edit this day's menu</a>
+</div>
+{% endif %}
+
+<a href="{% url 'admin_portal' %}" class="btn btn-secondary">← Back to dashboard</a>
+{% endblock %}

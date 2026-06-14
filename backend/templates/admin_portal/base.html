@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Admin{% endblock %} - Food Ordering</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+            display: flex;
+        }
+        .sidebar {
+            width: 260px;
+            background: #1a202c;
+            color: #fff;
+            min-height: 100vh;
+            padding: 24px 0;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar .brand {
+            padding: 0 24px 24px;
+            border-bottom: 1px solid #2d3748;
+            margin-bottom: 16px;
+        }
+        .sidebar .brand h1 { font-size: 1.1rem; }
+        .sidebar .brand p { font-size: 0.75rem; color: #a0aec0; margin-top: 4px; }
+        .sidebar nav a {
+            display: block;
+            padding: 12px 24px;
+            color: #cbd5e0;
+            text-decoration: none;
+            font-size: 0.9rem;
+            border-left: 3px solid transparent;
+        }
+        .sidebar nav a:hover, .sidebar nav a.active {
+            background: #2d3748;
+            color: #fff;
+            border-left-color: #667eea;
+        }
+        .sidebar nav { flex: 1; }
+        .sidebar .footer-links {
+            padding: 16px 24px 24px;
+            border-top: 1px solid #2d3748;
+            font-size: 0.85rem;
+        }
+        .sidebar .footer-links a {
+            color: #cbd5e0;
+            text-decoration: none;
+            display: block;
+            margin: 10px 0;
+        }
+        .sidebar .footer-links a:hover { color: #fff; }
+        .sidebar .footer-links .logout-btn {
+            display: block;
+            width: 100%;
+            margin-top: 8px;
+            padding: 10px 14px;
+            background: #fc8181;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+        }
+        .sidebar .footer-links .logout-btn:hover { background: #f56565; }
+        .main { flex: 1; display: flex; flex-direction: column; }
+        .topbar {
+            background: #fff;
+            padding: 16px 32px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .topbar h2 { font-size: 1.25rem; color: #2d3748; }
+        .topbar-right { display: flex; align-items: center; gap: 16px; }
+        .topbar .user { font-size: 0.85rem; color: #718096; }
+        .topbar-actions { display: flex; align-items: center; gap: 12px; }
+        .btn-logout {
+            padding: 8px 16px;
+            background: #edf2f7;
+            color: #4a5568;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: 1px solid #e2e8f0;
+        }
+        .btn-logout:hover { background: #fed7d7; color: #c53030; border-color: #fc8181; }
+        .sidebar nav a.logout-link {
+            margin-top: 24px;
+            border-top: 1px solid #2d3748;
+            padding-top: 20px;
+            color: #fc8181;
+        }
+        .sidebar nav a.logout-link:hover {
+            background: #2d3748;
+            border-left-color: #fc8181;
+            color: #fed7d7;
+        }
+        .topbar .logout-top {
+            padding: 8px 16px;
+            background: #fff;
+            color: #c53030;
+            border: 1px solid #feb2b2;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .topbar .logout-top:hover { background: #fff5f5; }
+        .content { padding: 32px; flex: 1; }
+        .messages { margin-bottom: 20px; }
+        .msg {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 0.875rem;
+        }
+        .msg-success { background: #c6f6d5; color: #22543d; }
+        .msg-error { background: #fed7d7; color: #742a2a; }
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            margin-bottom: 24px;
+        }
+        .card h3 { color: #2d3748; margin-bottom: 16px; font-size: 1rem; }
+        .btn {
+            display: inline-block;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+        }
+        .btn-primary { background: #667eea; color: #fff; }
+        .btn-secondary { background: #edf2f7; color: #4a5568; }
+        .btn-success { background: #48bb78; color: #fff; }
+        .btn-danger { background: #fc8181; color: #fff; }
+        .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge-published { background: #c6f6d5; color: #22543d; }
+        .badge-draft { background: #feebc8; color: #7b341e; }
+        .badge-standard { background: #bee3f8; color: #2a4365; }
+        .badge-custom { background: #e9d8fd; color: #553c9a; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #edf2f7; }
+        th { color: #718096; font-size: 0.75rem; text-transform: uppercase; }
+        .form-row { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+        .form-row input, .form-row select, .form-row textarea {
+            padding: 10px 14px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        .form-row input[type="text"] { flex: 1; min-width: 200px; }
+        .grid-7 { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+        .day-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #e2e8f0;
+        }
+        .day-card h4 { color: #2d3748; margin-bottom: 8px; }
+        .day-card ul { list-style: none; margin: 12px 0; }
+        .day-card li { padding: 4px 0; color: #4a5568; font-size: 0.875rem; }
+        .day-card li::before { content: "• "; color: #667eea; }
+        .empty { color: #a0aec0; font-style: italic; font-size: 0.875rem; }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="brand">
+            <h1>🍽️ Admin Portal</h1>
+            <p>Menu Management</p>
+        </div>
+        <nav>
+            <a href="{% url 'admin_portal' %}" class="{% if request.resolver_match.url_name == 'admin_portal' %}active{% endif %}">Dashboard</a>
+            <a href="{% url 'admin_daily_orders' %}" class="{% if request.resolver_match.url_name == 'admin_daily_orders' or request.resolver_match.url_name == 'admin_daily_orders_date' %}active{% endif %}">Today's Orders</a>
+            <a href="{% url 'admin_weekly_menu' %}" class="{% if request.resolver_match.url_name == 'admin_weekly_menu' or request.resolver_match.url_name == 'admin_edit_weekday' %}active{% endif %}">Weekly Standard Menu</a>
+            <a href="{% url 'admin_daily_menus' %}" class="{% if request.resolver_match.url_name == 'admin_daily_menus' or request.resolver_match.url_name == 'admin_edit_daily' %}active{% endif %}">Daily Menu Overrides</a>
+            <a href="{% url 'logout' %}" class="logout-link">Logout</a>
+        </nav>
+        <div class="footer-links">
+            <p style="color:#718096; font-size:0.75rem; margin-bottom:8px;">Logged in as<br><strong style="color:#cbd5e0;">{{ request.user.email }}</strong></p>
+        </div>
+    </aside>
+    <div class="main">
+        <div class="topbar">
+            <h2>{% block page_title %}Admin{% endblock %}</h2>
+            <div class="topbar-actions">
+                <span class="user">{{ request.user.get_full_name }}</span>
+                <a href="{% url 'logout' %}" class="btn-logout">Logout</a>
+            </div>
+        </div>
+        <div class="content">
+            {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                <div class="msg msg-{{ message.tags }}">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+</body>
+</html>

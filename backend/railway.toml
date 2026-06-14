@@ -1,0 +1,13 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "gunicorn food_ordering.wsgi:application --bind 0.0.0.0:$PORT --workers ${WEB_CONCURRENCY:-3} --timeout 120"
+preDeployCommand = "python manage.py migrate --noinput && python manage.py collectstatic --noinput && python manage.py ensure_admin_user"
+healthcheckPath = "/health/"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"
+
+# Railway: create separate services for Celery (see DEPLOYMENT.md)
+# Worker: celery -A food_ordering worker --loglevel=info --concurrency=2
+# Beat:   celery -A food_ordering beat --loglevel=info

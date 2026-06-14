@@ -1,0 +1,80 @@
+{% extends 'admin_portal/base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h3>Today's Menu — {{ today|date:"l, d M Y" }}</h3>
+    {% if today_items %}
+    <ul style="list-style:none; margin: 12px 0;">
+        {% for item in today_items %}
+        <li style="padding:6px 0; color:#4a5568;">• {{ item.name }}{% if item.category %} <span style="color:#a0aec0;font-size:0.8rem;">({{ item.get_category_display|default:item.category }})</span>{% endif %}</li>
+        {% endfor %}
+    </ul>
+    <p>
+        {% if today_source == 'custom' %}
+        <span class="badge badge-custom">Custom menu</span>
+        {% else %}
+        <span class="badge badge-standard">Standard weekly menu</span>
+        {% endif %}
+        {% if today_menu %}
+        <span class="badge badge-{{ today_menu.status }}">{{ today_menu.get_status_display }}</span>
+        {% endif %}
+    </p>
+    {% else %}
+    <p class="empty">No menu set for today. Configure the weekly standard menu or add a daily override.</p>
+    {% endif %}
+    <div style="margin-top:16px;">
+        <a href="{% url 'admin_edit_daily' today.year today.month today.day %}" class="btn btn-primary btn-sm">Edit today's menu</a>
+        <a href="{% url 'admin_weekly_menu' %}" class="btn btn-secondary btn-sm">Weekly standard menu</a>
+    </div>
+</div>
+
+<div class="card">
+    <h3>Today's Orders — Kitchen quantities</h3>
+    <p style="color:#718096; font-size:0.9rem; margin-bottom:16px;">
+        How many users ordered and total quantity per item (no names).
+    </p>
+
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:12px; margin-bottom:16px;">
+        <div style="background:#ebf8ff; padding:16px; border-radius:8px; text-align:center;">
+            <div style="font-size:1.5rem; font-weight:700; color:#2b6cb0;">{{ order_totals.total_users }}</div>
+            <div style="font-size:0.75rem; color:#4a5568;">Users ordered</div>
+        </div>
+        <div style="background:#f0fff4; padding:16px; border-radius:8px; text-align:center;">
+            <div style="font-size:1.5rem; font-weight:700; color:#276749;">{{ order_totals.total_items }}</div>
+            <div style="font-size:0.75rem; color:#4a5568;">Total items</div>
+        </div>
+    </div>
+
+    {% if order_totals.items %}
+    <table>
+        <thead>
+            <tr><th>Item</th><th style="text-align:right;">Qty</th></tr>
+        </thead>
+        <tbody>
+            {% for row in order_totals.items %}
+            <tr>
+                <td>{{ row.item_name }}</td>
+                <td style="text-align:right; font-weight:600;">{{ row.total_quantity }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No orders yet today.</p>
+    {% endif %}
+
+    <a href="{% url 'admin_daily_orders' %}" class="btn btn-primary btn-sm" style="margin-top:16px;">Full kitchen report</a>
+</div>
+
+<div class="card">
+    <h3>Quick actions</h3>
+    <p style="color:#718096; margin-bottom:16px; font-size:0.9rem;">
+        Set the <strong>standard menu for each weekday</strong> (Mon–Sun). Users see this by default.
+        Optionally <strong>override any specific day</strong> when you need a different menu.
+    </p>
+    <a href="{% url 'admin_weekly_menu' %}" class="btn btn-primary">Manage weekly standard menu</a>
+    <a href="{% url 'admin_daily_menus' %}" class="btn btn-secondary" style="margin-left:8px;">Daily overrides (next 14 days)</a>
+</div>
+{% endblock %}

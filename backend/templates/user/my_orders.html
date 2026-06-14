@@ -1,0 +1,33 @@
+{% extends 'user/base.html' %}
+{% block title %}My Orders{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>My Orders</h2>
+    <p class="sub">Your recent meal orders</p>
+
+    {% if orders %}
+    {% for order in orders %}
+    <div class="order-card">
+        <p><strong>{{ order.order_date|date:"l, d M Y" }}</strong>
+           <span class="badge badge-open" style="margin-left:8px;">{{ order.get_status_display }}</span>
+        </p>
+        <ul style="list-style:none; margin-top:8px;">
+            {% for oi in order.order_items.all %}
+            <li style="padding:4px 0; color:#4a5568;">{{ oi.quantity }}× {{ oi.item_name }}</li>
+            {% endfor %}
+        </ul>
+        {% if order.notes %}
+        <p style="font-size:0.85rem; color:#718096; margin-top:6px;">Note: {{ order.notes }}</p>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty">
+        <div class="icon">🛒</div>
+        <p>No orders yet.</p>
+        <p style="margin-top:8px;"><a href="{% url 'today_menu' %}">Order from today's menu →</a></p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
