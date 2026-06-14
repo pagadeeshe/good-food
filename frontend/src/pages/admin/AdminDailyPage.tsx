@@ -44,7 +44,7 @@ export function AdminDailyPage() {
       <PageHeader
         eyebrow="Admin"
         title="Daily Menus"
-        subtitle={`Employees are ordering for ${orderingForLabel || 'tomorrow'} — publish that date's menu.`}
+        subtitle={`Students are ordering for ${orderingForLabel || 'tomorrow'} — publish that date's menu.`}
         icon="🗓️"
       />
 
@@ -54,7 +54,7 @@ export function AdminDailyPage() {
           <div>
             <strong>Active ordering date: {orderingForLabel}</strong>
             <p className="muted">
-              Only menus published for this date appear on the order page. Publishing today&apos;s date will not show to employees.
+              Only menus published for this date appear on the order page. Publishing today&apos;s date will not show to students.
             </p>
           </div>
         </div>
@@ -124,6 +124,7 @@ interface DailyDetail {
   daily_menu: {
     id: number;
     status: string;
+    is_editable?: boolean;
     expires_at_display: string | null;
     ordering_deadline_message: string;
   } | null;
@@ -178,6 +179,9 @@ export function AdminDailyEditPage({
     weekday: 'long', day: 'numeric', month: 'long',
   });
 
+  const isPublished = detail.daily_menu?.status === 'published';
+  const isEditable = detail.daily_menu?.is_editable ?? detail.daily_menu?.status !== 'published';
+
   return (
     <div className="admin-page">
       <PageHeader
@@ -199,7 +203,7 @@ export function AdminDailyEditPage({
               ?? `Orders close at ${ORDER_DEADLINE} on the menu date`}
           </strong>
           <p className="muted">
-            Employees order today for this menu date. On Sunday they see Monday&apos;s menu; orders close Monday at 10:00 AM.
+            Students order today for this menu date. On Sunday they see Monday&apos;s menu; orders close Monday at 10:00 AM.
           </p>
         </div>
       </div>
@@ -208,13 +212,21 @@ export function AdminDailyEditPage({
         {error && <div className="alert error">{error}</div>}
         {message && <div className="alert success">{message}</div>}
 
+        {isPublished && (
+          <p className="alert success" style={{ marginBottom: '1rem' }}>
+            This menu is published and locked. Students can order from it until the deadline — items cannot be changed.
+          </p>
+        )}
+
+        {isEditable ? (
         <div className="actions">
           <button type="button" className="btn-primary" onClick={() => action({ action: 'publish' })}>Publish</button>
           <button type="button" className="btn-secondary" onClick={() => action({ action: 'unpublish' })}>Unpublish</button>
           <button type="button" className="btn-secondary" onClick={() => action({ action: 'reset_to_standard' })}>Reset to standard</button>
         </div>
+        ) : null}
 
-        <h3 className="section-title">Custom items</h3>
+        <h3 className="section-title">Menu items</h3>
         {detail.custom_items.length === 0 ? (
           <p className="muted">{detail.using_standard ? 'Using standard weekly template.' : 'No custom items.'}</p>
         ) : (
@@ -222,17 +234,21 @@ export function AdminDailyEditPage({
             {detail.custom_items.map((item) => (
               <li key={item.id} className="item-row-between">
                 <span>{item.name}</span>
-                <button type="button" className="btn-danger"
-                  onClick={() => action({ action: 'delete_item', item_id: item.id })}>Remove</button>
+                {isEditable && (
+                  <button type="button" className="btn-danger"
+                    onClick={() => action({ action: 'delete_item', item_id: item.id })}>Remove</button>
+                )}
               </li>
             ))}
           </ul>
         )}
 
+        {isEditable && (
         <form onSubmit={handleAdd} className="inline-form">
           <input value={newItem} onChange={(e) => setNewItem(e.target.value)} placeholder="Add item…" />
           <button type="submit" className="btn-primary">Add</button>
         </form>
+        )}
 
         {detail.standard_items.length > 0 && (
           <>

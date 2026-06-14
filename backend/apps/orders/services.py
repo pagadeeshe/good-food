@@ -31,12 +31,12 @@ def get_daily_order_totals(menu_date, meal_type=None):
 
     item_list = list(item_rows)
     total_items = sum(row['total_quantity'] for row in item_list)
-    total_users = orders.values('user').distinct().count()
+    total_students = orders.values('user').distinct().count()
     total_orders = orders.count()
 
     return {
         'meal_type': meal_type,
-        'total_users': total_users,
+        'total_students': total_students,
         'total_orders': total_orders,
         'total_items': total_items,
         'items': item_list,

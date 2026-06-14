@@ -40,7 +40,7 @@ class UserListCreateView(generics.ListCreateAPIView):
                 Q(first_name__icontains=search) |
                 Q(last_name__icontains=search) |
                 Q(email__icontains=search) |
-                Q(employee_id__icontains=search)
+                Q(student_id__icontains=search)
             )
         
         # Filter by role
@@ -239,7 +239,7 @@ def inactive_users(request):
         
         users_data.append({
             'id': user.id,
-            'employee_id': user.employee_id,
+            'student_id': user.student_id,
             'full_name': user.get_full_name(),
             'email': user.email,
             'last_order_date': last_order.order_date if last_order else None,
@@ -271,7 +271,7 @@ def top_users(request):
     for user in top_users:
         users_data.append({
             'id': user.id,
-            'employee_id': user.employee_id,
+            'student_id': user.student_id,
             'full_name': user.get_full_name(),
             'email': user.email,
             'total_orders': user.order_count,

@@ -48,8 +48,8 @@ export function AdminOrdersReportPage() {
         </div>
         <div className="stat stat-2">
           <span className="stat-icon" aria-hidden>👥</span>
-          <strong>{mealReport.total_users}</strong>
-          <span>People</span>
+          <strong>{mealReport.total_students}</strong>
+          <span>Students</span>
         </div>
         <div className="stat stat-3">
           <span className="stat-icon" aria-hidden>🥡</span>

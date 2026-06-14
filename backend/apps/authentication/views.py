@@ -209,7 +209,7 @@ def user_permissions(request):
     permissions_data = {
         'user_id': user.id,
         'email': user.email,
-        'employee_id': user.employee_id,
+        'student_id': user.student_id,
         'role': user.role,
         'is_admin': user.is_admin,
         'is_staff': user.is_staff,

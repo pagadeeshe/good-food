@@ -55,7 +55,7 @@ export function Layout() {
             <span className="avatar">{initial}</span>
             <div className="user-meta">
               <span className="user-name">{user?.full_name}</span>
-              <span className="user-role">{isAdmin ? 'Admin' : 'Employee'}</span>
+              <span className="user-role">{isAdmin ? 'Admin' : 'Student'}</span>
             </div>
           </div>
           <button type="button" className="btn-ghost" onClick={() => logout()}>

@@ -135,6 +135,10 @@ class DailyMenu(models.Model):
         return cutoff_display_for_meal(self.meal_type)
 
     @property
+    def is_editable(self):
+        return self.status == 'draft'
+
+    @property
     def ordering_deadline_at(self):
         """10:00 AM on the menu date in the local timezone."""
         if not self.date:

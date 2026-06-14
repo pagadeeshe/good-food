@@ -43,7 +43,7 @@ Default admin is created on deploy (`ensure_admin_user`). Change the password af
 
 ### Users
 
-Add employees via Django admin (`/django-admin/`) or `POST /api/users/` (admin JWT). Local and production databases are separate.
+Add students via Django admin (`/django-admin/`) or `POST /api/users/` (admin JWT). Local and production databases are separate.
 
 ## API
 

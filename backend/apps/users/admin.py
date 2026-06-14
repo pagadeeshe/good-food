@@ -10,16 +10,16 @@ class UserAdmin(BaseUserAdmin):
     Custom User admin with enhanced functionality for managing 10,000+ users.
     """
     
-    list_display = ['employee_id', 'email', 'get_full_name', 'role', 'is_active', 'last_login', 'created_at']
+    list_display = ['student_id', 'email', 'get_full_name', 'role', 'is_active', 'last_login', 'created_at']
     list_filter = ['role', 'is_active', 'created_at', 'last_login']
-    search_fields = ['email', 'employee_id', 'first_name', 'last_name']
+    search_fields = ['email', 'student_id', 'first_name', 'last_name']
     ordering = ['-created_at']
     list_per_page = 50
     
     # Field groupings
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
-        ('Personal Info', {'fields': ('employee_id', 'first_name', 'last_name', 'phone_number')}),
+        ('Personal Info', {'fields': ('student_id', 'first_name', 'last_name', 'phone_number')}),
         ('Permissions', {'fields': ('role', 'is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Important dates', {'fields': ('last_login', 'date_joined')}),
     )
@@ -27,7 +27,7 @@ class UserAdmin(BaseUserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('email', 'employee_id', 'first_name', 'last_name', 'role', 'password1', 'password2'),
+            'fields': ('email', 'student_id', 'first_name', 'last_name', 'role', 'password1', 'password2'),
         }),
     )
     
@@ -70,7 +70,7 @@ class UserProfileAdmin(admin.ModelAdmin):
     
     list_display = ['user', 'total_orders', 'last_order_date', 'created_at']
     list_filter = ['last_order_date', 'created_at']
-    search_fields = ['user__email', 'user__employee_id', 'user__first_name', 'user__last_name']
+    search_fields = ['user__email', 'user__student_id', 'user__first_name', 'user__last_name']
     readonly_fields = ['total_orders', 'last_order_date', 'created_at', 'updated_at']
     
     fieldsets = (

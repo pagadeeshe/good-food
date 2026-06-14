@@ -30,7 +30,7 @@ class Command(BaseCommand):
         admin_user, created = User.objects.get_or_create(
             email=admin_email,
             defaults={
-                'employee_id': 'ADMIN001',
+                'student_id': 'ADMIN001',
                 'first_name': 'Admin',
                 'last_name': 'User',
                 'role': 'admin',

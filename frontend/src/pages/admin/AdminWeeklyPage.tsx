@@ -17,8 +17,6 @@ export function AdminWeeklyPage() {
   async function load() {
     const data = await apiRequest<WeeklyTemplateDay[]>('/api/admin/weekly/');
     setDays(data);
-    const mealDays = data.filter((d) => d.meal_type === activeMeal);
-    if (selected === null && mealDays.length > 0) setSelected(mealDays[0].weekday);
   }
 
   useEffect(() => {
@@ -27,18 +25,25 @@ export function AdminWeeklyPage() {
 
   useEffect(() => {
     const mealDays = days.filter((d) => d.meal_type === activeMeal);
-    if (mealDays.length > 0) setSelected(mealDays[0].weekday);
+    if (mealDays.length === 0) return;
+    setSelected((prev) => {
+      if (prev !== null && mealDays.some((d) => d.weekday === prev)) return prev;
+      return mealDays[0].weekday;
+    });
   }, [activeMeal, days]);
 
   const mealDays = days.filter((d) => d.meal_type === activeMeal);
   const current = mealDays.find((d) => d.weekday === selected);
 
+  const isLocked = current?.is_locked ?? false;
+
   async function postAction(body: Record<string, unknown>) {
-    if (selected === null) return;
+    const weekday = current?.weekday;
+    if (weekday === undefined || isLocked) return;
     setError('');
     setMessage('');
     try {
-      await apiRequest(`/api/admin/weekly/${selected}/${activeMeal}/`, {
+      await apiRequest(`/api/admin/weekly/${weekday}/${activeMeal}/`, {
         method: 'POST',
         body: JSON.stringify(body),
       });
@@ -96,20 +101,29 @@ export function AdminWeeklyPage() {
 
             {current?.template && (
               <>
+                {isLocked && (
+                  <div className="alert warning">
+                    This template is locked because tomorrow&apos;s menu for this day is already published.
+                  </div>
+                )}
                 <p className="muted">{current.template.description || 'No description yet.'}</p>
                 <ul className="admin-item-list">
                   {current.template.template_items.map((item) => (
                     <li key={item.id} className="item-row-between">
                       <span>{item.name} <span className={`badge badge-${item.category}`}>{item.category}</span></span>
-                      <button type="button" className="btn-danger"
-                        onClick={() => postAction({ action: 'delete_item', item_id: item.id })}>Remove</button>
+                      {!isLocked && (
+                        <button type="button" className="btn-danger"
+                          onClick={() => postAction({ action: 'delete_item', item_id: item.id })}>Remove</button>
+                      )}
                     </li>
                   ))}
                 </ul>
-                <form onSubmit={handleAdd} className="inline-form">
-                  <input value={newItem} onChange={(e) => setNewItem(e.target.value)} placeholder="Add new item…" />
-                  <button type="submit" className="btn-primary">Add item</button>
-                </form>
+                {!isLocked && (
+                  <form onSubmit={handleAdd} className="inline-form">
+                    <input value={newItem} onChange={(e) => setNewItem(e.target.value)} placeholder="Add new item…" />
+                    <button type="submit" className="btn-primary">Add item</button>
+                  </form>
+                )}
               </>
             )}
           </>

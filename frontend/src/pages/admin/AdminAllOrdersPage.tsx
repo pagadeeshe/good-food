@@ -103,7 +103,7 @@ export function AdminAllOrdersPage() {
             title="No orders yet"
             message={
               filterMode === 'all'
-                ? 'No employee orders have been placed.'
+                ? 'No student orders have been placed.'
                 : `No orders for ${menuDateLabel || 'this menu date'} yet.`
             }
           />
@@ -113,8 +113,8 @@ export function AdminAllOrdersPage() {
           <table className="data-table admin-orders-table">
             <thead>
               <tr>
-                <th>Employee</th>
-                <th>ID</th>
+                <th>Student</th>
+                <th>Student ID</th>
                 <th>Menu date</th>
                 <th>Meal</th>
                 <th>Items ordered</th>
@@ -126,7 +126,7 @@ export function AdminAllOrdersPage() {
               {orders.map((order) => (
                 <tr key={order.id}>
                   <td><strong>{order.user_name}</strong></td>
-                  <td className="muted">{order.employee_id}</td>
+                  <td className="muted">{order.student_id}</td>
                   <td>
                     {new Date(order.menu_date + 'T12:00:00').toLocaleDateString('en-IN', {
                       weekday: 'short', day: 'numeric', month: 'short',

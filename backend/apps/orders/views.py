@@ -141,7 +141,7 @@ class TodayOrderView(APIView):
 
 
 class AdminOrdersListView(generics.ListAPIView):
-    """List all employee orders with names and item quantities (admin only)."""
+    """List all student orders with names and item quantities (admin only)."""
 
     serializer_class = AdminOrderSerializer
     permission_classes = [CanViewReports]

@@ -2,6 +2,7 @@ from rest_framework import generics, status, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.exceptions import ValidationError
 from django.db.models import F, Q, Count, Sum
 from django.utils import timezone
 from django.core.cache import cache
@@ -9,7 +10,7 @@ from django.shortcuts import get_object_or_404
 
 from apps.authentication.permissions import IsAdminUser, CanManageMenus, ReadOnlyOrAdmin
 from .models import WeeklyMenu, DailyMenu, MenuItem, MenuTemplate, MenuTemplateItem
-from .services import get_ordering_target_date, get_today_published_menu, publish_daily_menu
+from .services import ensure_menu_editable, get_ordering_target_date, get_today_published_menu, publish_daily_menu
 from .serializers import (
     WeeklyMenuSerializer, WeeklyMenuCreateSerializer,
     DailyMenuSerializer, DailyMenuCreateSerializer, TodayMenuSerializer,
@@ -92,13 +93,17 @@ class DailyMenuDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [CanManageMenus]
     
     def perform_update(self, serializer):
-        # Clear cache when menu is updated
+        ensure_menu_editable(self.get_object())
         menu = serializer.save()
         cache_keys = [
-            f"today_menu_{menu.date}",
+            f"ordering_menu_{menu.date}",
             f"daily_menu_{menu.id}",
         ]
         cache.delete_many(cache_keys)
+
+    def perform_destroy(self, instance):
+        ensure_menu_editable(instance)
+        instance.delete()
 
 
 class MenuItemListCreateView(generics.ListCreateAPIView):
@@ -120,11 +125,10 @@ class MenuItemListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         daily_menu_id = self.kwargs['daily_menu_id']
         daily_menu = get_object_or_404(DailyMenu, id=daily_menu_id)
+        ensure_menu_editable(daily_menu)
         serializer.save(daily_menu=daily_menu)
-        
-        # Clear cache
         cache_keys = [
-            f"today_menu_{daily_menu.date}",
+            f"ordering_menu_{daily_menu.date}",
             f"daily_menu_{daily_menu.id}",
         ]
         cache.delete_many(cache_keys)
@@ -137,13 +141,24 @@ class MenuItemDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = MenuItem.objects.select_related('daily_menu')
     serializer_class = MenuItemSerializer
     permission_classes = [CanManageMenus]
-    
+
     def perform_update(self, serializer):
+        item = serializer.instance
+        ensure_menu_editable(item.daily_menu)
         item = serializer.save()
-        # Clear cache
         cache_keys = [
-            f"today_menu_{item.daily_menu.date}",
+            f"ordering_menu_{item.daily_menu.date}",
             f"daily_menu_{item.daily_menu.id}",
+        ]
+        cache.delete_many(cache_keys)
+
+    def perform_destroy(self, instance):
+        ensure_menu_editable(instance.daily_menu)
+        daily_menu = instance.daily_menu
+        instance.delete()
+        cache_keys = [
+            f"ordering_menu_{daily_menu.date}",
+            f"daily_menu_{daily_menu.id}",
         ]
         cache.delete_many(cache_keys)
 
@@ -224,6 +239,14 @@ class MenuItemBulkUpdateView(APIView):
     permission_classes = [IsAdminUser]
     
     def post(self, request, daily_menu_id):
+        daily_menu = get_object_or_404(DailyMenu, id=daily_menu_id)
+        try:
+            ensure_menu_editable(daily_menu)
+        except ValidationError as exc:
+            detail = exc.detail
+            message = detail[0] if isinstance(detail, list) else detail
+            return Response({'error': str(message)}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = MenuItemBulkUpdateSerializer(data=request.data)
         
         if serializer.is_valid():
@@ -247,9 +270,8 @@ class MenuItemBulkUpdateView(APIView):
                 updated_count = items.update(max_quantity_per_user=max_quantity)
             
             # Clear cache
-            daily_menu = get_object_or_404(DailyMenu, id=daily_menu_id)
             cache_keys = [
-                f"today_menu_{daily_menu.date}",
+                f"ordering_menu_{daily_menu.date}",
                 f"daily_menu_{daily_menu.id}",
             ]
             cache.delete_many(cache_keys)

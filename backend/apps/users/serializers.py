@@ -14,7 +14,7 @@ class UserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'employee_id', 'email', 'first_name', 'last_name', 
+            'id', 'student_id', 'email', 'first_name', 'last_name', 
             'full_name', 'role', 'is_active', 'last_login', 
             'date_joined', 'total_orders'
         ]
@@ -35,7 +35,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'employee_id', 'email', 'first_name', 'last_name', 
+            'id', 'student_id', 'email', 'first_name', 'last_name', 
             'full_name', 'phone_number', 'role', 'is_active', 
             'last_login', 'date_joined', 'profile', 'order_statistics'
         ]
@@ -81,22 +81,22 @@ class UserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'employee_id', 'email', 'first_name', 'last_name', 
+            'student_id', 'email', 'first_name', 'last_name', 
             'phone_number', 'role', 'password'
         ]
     
-    def validate_employee_id(self, value):
-        """Validate employee ID format and uniqueness."""
-        if User.objects.filter(employee_id=value).exists():
-            raise serializers.ValidationError('Employee ID already exists.')
+    def validate_student_id(self, value):
+        """Validate student ID format and uniqueness."""
+        if User.objects.filter(student_id=value).exists():
+            raise serializers.ValidationError('Student ID already exists.')
         return value.upper()
-    
+
     def validate_email(self, value):
         """Validate email uniqueness."""
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError('Email already registered.')
         return value.lower()
-    
+
     def create(self, validated_data):
         """Create new user with profile."""
         password = validated_data.pop('password')

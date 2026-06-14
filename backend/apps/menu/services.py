@@ -2,7 +2,15 @@ from datetime import date, timedelta
 
 from django.utils import timezone
 
-from .constants import MEAL_DINNER, MEAL_LUNCH, MEAL_TYPES, ORDER_DEADLINE_DISPLAY, is_valid_meal_type
+from .constants import (
+    MEAL_DINNER,
+    MEAL_LUNCH,
+    MEAL_TYPES,
+    MENU_LOCKED_MESSAGE,
+    ORDER_DEADLINE_DISPLAY,
+    WEEKDAY_TEMPLATE_LOCKED_MESSAGE,
+    is_valid_meal_type,
+)
 from .models import DailyMenu, MenuItem, MenuTemplate, MenuTemplateItem
 
 
@@ -90,6 +98,31 @@ def apply_standard_menu(menu_date, user, meal_type=MEAL_LUNCH, publish=False):
     if publish:
         publish_daily_menu(daily_menu)
     return daily_menu, None
+
+
+def is_weekday_template_locked(weekday, meal_type):
+    """Lock template edits when the active ordering menu for this weekday is published."""
+    ordering_for = get_ordering_target_date()
+    if ordering_for.weekday() != weekday:
+        return False
+    return DailyMenu.objects.filter(
+        date=ordering_for,
+        meal_type=meal_type,
+        status__in=['published', 'closed'],
+    ).exists()
+
+
+def ensure_weekday_template_editable(weekday, meal_type):
+    if is_weekday_template_locked(weekday, meal_type):
+        from rest_framework.exceptions import ValidationError
+        raise ValidationError(WEEKDAY_TEMPLATE_LOCKED_MESSAGE)
+
+
+def ensure_menu_editable(daily_menu):
+    """Raise ValidationError if the menu is published or closed."""
+    if daily_menu and daily_menu.status != 'draft':
+        from rest_framework.exceptions import ValidationError
+        raise ValidationError(MENU_LOCKED_MESSAGE)
 
 
 def upcoming_dates(days=14):

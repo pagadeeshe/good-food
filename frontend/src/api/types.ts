@@ -14,7 +14,7 @@ export const MEAL_DEADLINES: Record<MealType, string> = {
 
 export interface User {
   id: number;
-  employee_id: string;
+  student_id: string;
   email: string;
   first_name: string;
   last_name: string;
@@ -86,7 +86,7 @@ export interface Order {
 
 export interface AdminOrder extends Order {
   user_name: string;
-  employee_id: string;
+  student_id: string;
   user_email: string;
   menu_date: string;
 }
@@ -101,7 +101,7 @@ export interface AdminOrdersResponse {
 export interface OrderTotals {
   date?: string;
   meal_type?: MealType | null;
-  total_users: number;
+  total_students: number;
   total_orders: number;
   total_items: number;
   items: { item_name: string; item_category: string; total_quantity: number }[];
@@ -139,6 +139,7 @@ export interface WeeklyTemplateDay {
     template_items: { id: number; name: string; category: string; sort_order: number }[];
   } | null;
   item_count: number;
+  is_locked?: boolean;
 }
 
 export interface UpcomingDay {

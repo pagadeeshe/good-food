@@ -26,7 +26,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Add custom claims
         token['user_id'] = user.id
         token['email'] = user.email
-        token['employee_id'] = user.employee_id
+        token['student_id'] = user.student_id
         token['full_name'] = user.get_full_name()
         token['role'] = user.role
         token['is_admin'] = user.is_admin
@@ -102,20 +102,21 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     """
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True)
+    student_id = serializers.CharField(write_only=True)
     
     class Meta:
         model = User
         fields = [
-            'employee_id', 'email', 'first_name', 'last_name', 
+            'student_id', 'email', 'first_name', 'last_name', 
             'phone_number', 'password', 'password_confirm'
         ]
     
-    def validate_employee_id(self, value):
-        """Validate employee ID format and uniqueness."""
-        if User.objects.filter(employee_id=value).exists():
-            raise serializers.ValidationError('Employee ID already exists.')
+    def validate_student_id(self, value):
+        """Validate student ID format and uniqueness."""
+        if User.objects.filter(student_id=value).exists():
+            raise serializers.ValidationError('Student ID already exists.')
         return value.upper()
-    
+
     def validate_email(self, value):
         """Validate email uniqueness."""
         if User.objects.filter(email=value).exists():
@@ -154,7 +155,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'employee_id', 'email', 'first_name', 'last_name',
+            'id', 'student_id', 'email', 'first_name', 'last_name',
             'full_name', 'phone_number', 'role', 'is_active',
             'is_portal_admin', 'last_login', 'date_joined'
         ]

@@ -14,6 +14,11 @@ MEAL_TYPES = [MEAL_LUNCH, MEAL_DINNER]
 ORDER_DEADLINE_TIME = time(10, 0)
 ORDER_DEADLINE_DISPLAY = '10:00 AM'
 
+MENU_LOCKED_MESSAGE = 'Published menus cannot be edited.'
+WEEKDAY_TEMPLATE_LOCKED_MESSAGE = (
+    "This weekly template is locked because tomorrow's menu for this day is already published."
+)
+
 # Legacy display labels (meal type names only)
 CUTOFF_DISPLAY = {
     MEAL_LUNCH: ORDER_DEADLINE_DISPLAY,

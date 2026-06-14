@@ -54,8 +54,8 @@ export function AdminDashboardPage() {
                   <span>Orders</span>
                 </div>
                 <div className="stat-mini">
-                  <strong>{slot.order_totals.total_users}</strong>
-                  <span>People</span>
+                  <strong>{slot.order_totals.total_students}</strong>
+                  <span>Students</span>
                 </div>
                 <div className="stat-mini">
                   <strong>{slot.order_totals.total_items}</strong>
@@ -64,7 +64,7 @@ export function AdminDashboardPage() {
               </div>
               {status !== 'published' && (
                 <p className="alert error" style={{ marginBottom: '0.75rem' }}>
-                  Not visible to employees — publish {MEAL_LABELS[meal].toLowerCase()} for {orderingForLabel}.
+                  Not visible to students — publish {MEAL_LABELS[meal].toLowerCase()} for {orderingForLabel}.
                 </p>
               )}
               {slot.items.length === 0 ? (

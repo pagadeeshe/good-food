@@ -5,6 +5,7 @@ from datetime import date
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
@@ -16,11 +17,15 @@ from .models import DailyMenu, MenuItem, MenuTemplate, MenuTemplateItem
 from .serializers import DailyMenuSerializer, MenuTemplateSerializer
 from .services import (
     WEEKDAYS,
+    MENU_LOCKED_MESSAGE,
     apply_standard_menu,
     daily_menu_for_date,
+    ensure_menu_editable,
+    ensure_weekday_template_editable,
     ensure_weekly_templates,
     get_ordering_target_date,
     get_weekday_template,
+    is_weekday_template_locked,
     menu_preview_for_date,
     publish_daily_menu,
     seed_sample_weekly_menus,
@@ -75,6 +80,7 @@ def weekly_templates(request):
                 'meal_type': meal_type,
                 'template': MenuTemplateSerializer(template).data if template else None,
                 'item_count': len(items),
+                'is_locked': is_weekday_template_locked(weekday, meal_type),
             })
     return Response(data)
 
@@ -95,6 +101,14 @@ def weekday_template_detail(request, weekday, meal_type):
         return Response(MenuTemplateSerializer(template).data)
 
     action = request.data.get('action')
+    if action in ('add_item', 'delete_item', 'update_description'):
+        try:
+            ensure_weekday_template_editable(weekday, meal_type)
+        except ValidationError as exc:
+            detail = exc.detail
+            message = detail[0] if isinstance(detail, list) else detail
+            return Response({'error': str(message)}, status=status.HTTP_400_BAD_REQUEST)
+
     if action == 'add_item':
         name = (request.data.get('name') or '').strip()
         if not name:
@@ -178,6 +192,12 @@ def daily_menu_detail(request, year, month, day, meal_type):
     daily_menu = daily_menu_for_date(menu_date, meal_type)
     template = get_weekday_template(menu_date.weekday(), meal_type)
     standard_items = template_items_list(template)
+
+    if action == 'publish':
+        if daily_menu and daily_menu.status == 'published':
+            return Response({'error': 'Menu is already published.'}, status=status.HTTP_400_BAD_REQUEST)
+    elif daily_menu and not daily_menu.is_editable:
+        return Response({'error': MENU_LOCKED_MESSAGE}, status=status.HTTP_400_BAD_REQUEST)
 
     if action == 'add_item':
         if not daily_menu:

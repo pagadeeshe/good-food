@@ -49,6 +49,7 @@ class DailyMenuSerializer(serializers.ModelSerializer):
     order_deadline_display = serializers.SerializerMethodField()
     ordering_deadline_message = serializers.CharField(read_only=True)
     is_ordering_open = serializers.BooleanField(read_only=True)
+    is_editable = serializers.BooleanField(read_only=True)
     orders_closed_reason = serializers.CharField(read_only=True)
 
     class Meta:
@@ -58,7 +59,7 @@ class DailyMenuSerializer(serializers.ModelSerializer):
             'status', 'cutoff_time', 'cutoff_time_display', 'published_at', 'expires_at',
             'expires_at_display', 'order_deadline_display', 'ordering_deadline_message',
             'description', 'total_orders', 'total_items_ordered', 'is_ordering_open',
-            'orders_closed_reason', 'menu_items', 'created_at',
+            'is_editable', 'orders_closed_reason', 'menu_items', 'created_at',
         ]
         read_only_fields = ['weekday', 'total_orders', 'total_items_ordered']
 

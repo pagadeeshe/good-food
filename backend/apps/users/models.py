@@ -8,17 +8,17 @@ class CustomUserManager(BaseUserManager):
     Custom user manager for email-based authentication
     """
     
-    def create_user(self, email, employee_id, first_name, last_name, password=None, **extra_fields):
+    def create_user(self, email, student_id, first_name, last_name, password=None, **extra_fields):
         """Create and return a regular user with an email and password."""
         if not email:
             raise ValueError('The Email field must be set')
-        if not employee_id:
-            raise ValueError('The Employee ID field must be set')
+        if not student_id:
+            raise ValueError('The Student ID field must be set')
         
         email = self.normalize_email(email)
         user = self.model(
             email=email,
-            employee_id=employee_id.upper(),
+            student_id=student_id.upper(),
             first_name=first_name,
             last_name=last_name,
             **extra_fields
@@ -27,7 +27,7 @@ class CustomUserManager(BaseUserManager):
         user.save(using=self._db)
         return user
     
-    def create_superuser(self, email, employee_id, first_name, last_name, password=None, **extra_fields):
+    def create_superuser(self, email, student_id, first_name, last_name, password=None, **extra_fields):
         """Create and return a superuser with an email and password."""
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
@@ -38,7 +38,7 @@ class CustomUserManager(BaseUserManager):
         if extra_fields.get('is_superuser') is not True:
             raise ValueError('Superuser must have is_superuser=True.')
         
-        return self.create_user(email, employee_id, first_name, last_name, password, **extra_fields)
+        return self.create_user(email, student_id, first_name, last_name, password, **extra_fields)
 
 
 class User(AbstractUser):
@@ -57,14 +57,14 @@ class User(AbstractUser):
     
     # Core fields
     email = models.EmailField(unique=True, db_index=True)
-    employee_id = models.CharField(
+    student_id = models.CharField(
         max_length=20, 
         unique=True, 
         db_index=True,
         validators=[
             RegexValidator(
                 regex=r'^[A-Z0-9]{3,20}$',
-                message='Employee ID must contain only uppercase letters and numbers, 3-20 characters.'
+                message='Student ID must contain only uppercase letters and numbers, 3-20 characters.'
             )
         ]
     )
@@ -97,19 +97,19 @@ class User(AbstractUser):
     
     # Authentication
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['employee_id', 'first_name', 'last_name']
+    REQUIRED_FIELDS = ['student_id', 'first_name', 'last_name']
     
     class Meta:
         db_table = 'users'
         indexes = [
             models.Index(fields=['email']),
-            models.Index(fields=['employee_id']),
+            models.Index(fields=['student_id']),
             models.Index(fields=['role']),
             models.Index(fields=['is_active']),
         ]
         
     def __str__(self):
-        return f"{self.get_full_name()} ({self.employee_id})"
+        return f"{self.get_full_name()} ({self.student_id})"
     
     def get_full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
