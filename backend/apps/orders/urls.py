@@ -1,9 +1,13 @@
 from django.urls import path
-from django.views.generic import TemplateView
+
+from . import views
 
 app_name = 'orders'
 
 urlpatterns = [
-    # Simple placeholder URLs for development
-    path('', TemplateView.as_view(template_name='orders/index.html'), name='index'),
+    path('today/', views.TodayOrderView.as_view(), name='today_order'),
+    path('my/', views.MyOrdersListView.as_view(), name='my_orders'),
+    path('<int:pk>/', views.OrderDetailView.as_view(), name='order_detail'),
+    path('reports/today/', views.today_order_totals, name='today_totals'),
+    path('reports/<int:year>/<int:month>/<int:day>/', views.daily_order_totals, name='daily_totals'),
 ]

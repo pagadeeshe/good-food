@@ -2,7 +2,7 @@ from rest_framework import generics, status, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.db.models import Q, Count, Sum
+from django.db.models import F, Q, Count, Sum
 from django.utils import timezone
 from django.core.cache import cache
 from django.shortcuts import get_object_or_404
@@ -464,7 +464,7 @@ def close_menu(request, daily_menu_id):
     daily_menu.save(update_fields=['status'])
     
     # Trigger report generation
-    from .tasks import generate_daily_order_report
+    from apps.orders.tasks import generate_daily_order_report
     generate_daily_order_report.delay(daily_menu.id)
     
     # Clear cache

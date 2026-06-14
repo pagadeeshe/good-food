@@ -17,8 +17,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         super().__init__(*args, **kwargs)
         self.fields['email'] = serializers.EmailField()
         self.fields['password'] = serializers.CharField(write_only=True)
-        # Remove the username field
-        del self.fields['username']
+        self.fields.pop('username', None)
     
     @classmethod
     def get_token(cls, user):
@@ -146,13 +145,18 @@ class UserProfileSerializer(serializers.ModelSerializer):
     User profile serializer for API responses.
     """
     full_name = serializers.CharField(source='get_full_name', read_only=True)
-    
+    is_portal_admin = serializers.SerializerMethodField()
+
+    def get_is_portal_admin(self, obj):
+        from apps.authentication.utils import is_authorized_admin
+        return is_authorized_admin(obj)
+
     class Meta:
         model = User
         fields = [
-            'id', 'employee_id', 'email', 'first_name', 'last_name', 
-            'full_name', 'phone_number', 'role', 'is_active', 
-            'last_login', 'date_joined'
+            'id', 'employee_id', 'email', 'first_name', 'last_name',
+            'full_name', 'phone_number', 'role', 'is_active',
+            'is_portal_admin', 'last_login', 'date_joined'
         ]
         read_only_fields = ['id', 'role', 'is_active', 'last_login', 'date_joined']
 

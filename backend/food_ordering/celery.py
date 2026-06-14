@@ -30,8 +30,3 @@ app.conf.beat_schedule = {
 }
 
 app.conf.timezone = 'Asia/Kolkata'
-
-
-@app.task(bind=True)
-def debug_task(self):
-    print(f'Request: {self.request!r}')

@@ -1,118 +1,56 @@
-# Food Ordering Platform
+# Good Food
 
-A scalable food ordering platform supporting 10,000+ users with daily menu management and real-time order processing.
+Office lunch ordering — React frontend on Vercel, Django API on Railway, PostgreSQL on Supabase.
 
-## Architecture
+## Repository
 
 ```
-Frontend (React + TypeScript)
-    ↓
-Backend API (Django + DRF)
-    ↓
-Database (PostgreSQL/Supabase) + Cache (Redis)
+frontend/   React + TypeScript (Vercel)
+backend/    Django REST API (Railway)
 ```
 
-## Features
+## Deploy
 
-- **Admin Portal**: Menu management, order analytics, user management
-- **User Portal**: Daily menu viewing, order placement, monthly summaries
-- **Scalability**: Supports 10,000+ users and 2,000+ concurrent users
-- **Security**: JWT authentication, rate limiting, CSRF protection
-- **Performance**: Redis caching, optimized database queries
+### Backend (Railway)
 
-## Tech Stack
+- Root directory: `backend`
+- Health check: `/health/`
+- On deploy: migrations, collectstatic, `ensure_admin_user`
 
-### Backend
-- Django 4.x
-- Django REST Framework
-- JWT Authentication
-- PostgreSQL (Supabase)
-- Redis
-- Celery
+| Variable | Required | Example |
+|----------|----------|---------|
+| `DJANGO_SETTINGS_MODULE` | Yes | `food_ordering.settings_production` |
+| `SECRET_KEY` | Yes | long random string |
+| `DEBUG` | Yes | `False` |
+| `ALLOWED_HOSTS` | Yes | `your-api.up.railway.app` |
+| `DATABASE_URL` | Yes | Supabase PostgreSQL connection string |
+| `ADMIN_EMAIL` | Yes | `admin@yourcompany.com` |
+| `CORS_ALLOWED_ORIGINS` | Yes | `https://your-app.vercel.app` |
+| `REDIS_URL` | No | Upstash Redis (cache + Celery) |
+| `SENTRY_DSN` | No | Sentry error tracking |
 
-### Frontend
-- React 19
-- TypeScript
-- Vite
-- Material UI
-- React Query
-- React Router
+Default admin is created on deploy (`ensure_admin_user`). Change the password after first login.
 
-## Quick Start
+### Frontend (Vercel)
 
-### Backend Setup
-```bash
-cd backend
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver
-```
+- Root directory: `frontend`
+- Build: `npm run build`
+- Output: `dist`
 
-### Frontend Setup
-```bash
-cd frontend
-npm install
-npm run dev
-```
+| Variable | Required | Example |
+|----------|----------|---------|
+| `VITE_API_URL` | Yes | `https://your-api.up.railway.app` |
 
-### Redis Setup
-```bash
-redis-server
-```
+### Users
 
-## API Endpoints
+Add employees via Django admin (`/django-admin/`) or `POST /api/users/` (admin JWT). Local and production databases are separate.
 
-### Authentication
-- POST `/api/auth/login` - User login
-- POST `/api/auth/logout` - User logout  
-- GET `/api/auth/profile` - Get user profile
+## API
 
-### User APIs
-- GET `/api/menu/today` - Get today's menu
-- POST `/api/orders` - Place order
-- GET `/api/orders/history` - Order history
-- GET `/api/orders/monthly-summary` - Monthly summary
-
-### Admin APIs
-- POST `/api/admin/menu` - Create menu
-- GET `/api/admin/reports/daily` - Daily reports
-- GET `/api/admin/users` - Manage users
-
-## Database Models
-
-- **User**: Employee information and authentication
-- **WeeklyMenu**: Weekly menu planning
-- **DailyMenu**: Daily menu with cutoff times
-- **MenuItem**: Individual food items
-- **Order**: User orders
-- **OrderItem**: Order line items
-
-## Security Features
-
-- JWT token authentication (15min access, 7 day refresh)
-- Role-based permissions (Admin/User)
-- Rate limiting (Redis-based)
-- CSRF protection
-- HTTPS enforcement
-- Password hashing (bcrypt)
-
-## Performance Optimizations
-
-- Redis caching for menus and summaries
-- Database query optimization
-- Background job processing with Celery
-- Load balancer ready architecture
-
-## Deployment
-
-Recommended stack:
-- **Frontend**: Vercel
-- **Backend**: Docker containers
-- **Database**: Supabase PostgreSQL
-- **Cache**: Redis Cloud
-- **Monitoring**: Sentry + Prometheus
-
-## License
-
-MIT License
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/login/` | JWT login |
+| GET/POST | `/api/orders/today/` | View / place today's order |
+| GET | `/api/orders/my/` | Order history |
+| GET | `/api/admin/dashboard/` | Admin dashboard |
+| GET | `/api/orders/reports/today/` | Kitchen report |

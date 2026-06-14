@@ -1,14 +1,14 @@
 """Shared Redis / Upstash connection helpers for cache and Celery."""
 
 import ssl
+from typing import Dict, Optional
 
 
 def is_tls_redis(url: str) -> bool:
     return url.startswith('rediss://')
 
 
-def django_redis_options(url: str) -> dict:
-    """django-redis OPTIONS for standard or Upstash TLS URLs."""
+def django_redis_options(url: str) -> Dict:
     options = {
         'CLIENT_CLASS': 'django_redis.client.DefaultClient',
     }
@@ -19,8 +19,7 @@ def django_redis_options(url: str) -> dict:
     return options
 
 
-def celery_ssl_options(url: str) -> dict | None:
-    """Celery broker/backend SSL options for Upstash."""
+def celery_ssl_options(url: str) -> Optional[Dict]:
     if is_tls_redis(url):
         return {'ssl_cert_reqs': ssl.CERT_REQUIRED}
     return None

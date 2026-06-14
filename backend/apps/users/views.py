@@ -3,6 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db.models import Q, Count, Sum
+from django.http import Http404
 from django.utils import timezone
 from django.core.cache import cache
 
