@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404
 
 from apps.authentication.permissions import IsAdminUser, CanManageMenus, ReadOnlyOrAdmin
 from .models import WeeklyMenu, DailyMenu, MenuItem, MenuTemplate, MenuTemplateItem
+from .services import get_ordering_target_date, get_today_published_menu, publish_daily_menu
 from .serializers import (
     WeeklyMenuSerializer, WeeklyMenuCreateSerializer,
     DailyMenuSerializer, DailyMenuCreateSerializer, TodayMenuSerializer,
@@ -21,38 +22,33 @@ from .serializers import (
 
 class TodayMenuView(APIView):
     """
-    Get today's menu for users to place orders.
-    Heavily cached for performance with 10,000+ users.
+    Get tomorrow's published menu — what users order today.
     """
     permission_classes = [permissions.IsAuthenticated]
-    
+
     def get(self, request):
-        today = timezone.now().date()
-        cache_key = f"today_menu_{today}"
-        
-        # Try cache first (5 minute TTL)
+        target = get_ordering_target_date()
+        cache_key = f"ordering_menu_{target}"
+
         cached_menu = cache.get(cache_key)
         if cached_menu:
             return Response(cached_menu)
-        
-        try:
-            daily_menu = DailyMenu.objects.select_related('weekly_menu').prefetch_related(
-                'menu_items'
-            ).get(date=today, status='published')
-            
-            serializer = TodayMenuSerializer(daily_menu)
-            data = serializer.data
-            
-            # Cache for 5 minutes
-            cache.set(cache_key, data, 300)
-            
-            return Response(data)
-            
-        except DailyMenu.DoesNotExist:
+
+        daily_menu = get_today_published_menu()
+        if not daily_menu:
             return Response(
-                {'error': 'No menu available for today'},
-                status=status.HTTP_404_NOT_FOUND
+                {
+                    'error': (
+                        f'No menu available for {target.strftime("%A, %d %b")}.'
+                    ),
+                },
+                status=status.HTTP_404_NOT_FOUND,
             )
+
+        serializer = TodayMenuSerializer(daily_menu)
+        data = serializer.data
+        cache.set(cache_key, data, 300)
+        return Response(data)
 
 
 class DailyMenuListView(generics.ListCreateAPIView):
@@ -429,14 +425,12 @@ def publish_menu(request, daily_menu_id):
             status=status.HTTP_400_BAD_REQUEST
         )
     
-    daily_menu.status = 'published'
-    daily_menu.save(update_fields=['status'])
-    
-    # Clear cache
+    publish_daily_menu(daily_menu)
+
     cache_keys = [
-        f"today_menu_{daily_menu.date}",
+        f"ordering_menu_{daily_menu.date}",
         f"daily_menu_{daily_menu.id}",
-        "menu_statistics"
+        "menu_statistics",
     ]
     cache.delete_many(cache_keys)
     

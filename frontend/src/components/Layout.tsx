@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const NAV_ITEMS = [
+const USER_NAV = [
   { to: '/today', label: "Today's Menu", icon: '🍽️' },
   { to: '/orders', label: 'My Orders', icon: '📋' },
 ] as const;
@@ -10,6 +10,7 @@ const ADMIN_ITEMS = [
   { to: '/admin', label: 'Dashboard', icon: '📊' },
   { to: '/admin/weekly', label: 'Weekly', icon: '📅' },
   { to: '/admin/daily', label: 'Daily', icon: '🗓️' },
+  { to: '/admin/orders', label: 'All Orders', icon: '📋' },
   { to: '/admin/reports', label: 'Kitchen', icon: '👨‍🍳' },
 ] as const;
 
@@ -45,7 +46,8 @@ export function Layout() {
           </div>
         </div>
         <nav className="nav">
-          {NAV_ITEMS.map(({ to, label, icon }) => navLink(to, label, icon))}
+          {(isAdmin ? USER_NAV.filter((item) => item.to !== '/orders') : USER_NAV)
+            .map(({ to, label, icon }) => navLink(to, label, icon))}
           {isAdmin && ADMIN_ITEMS.map(({ to, label, icon }) => navLink(to, label, icon))}
         </nav>
         <div className="user-bar">

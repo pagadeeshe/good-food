@@ -49,13 +49,12 @@ export function MyOrdersPage() {
                 <div>
                   <time>
                     {new Date(order.order_date).toLocaleDateString('en-IN', {
-                      weekday: 'short',
-                      day: 'numeric',
-                      month: 'short',
-                      year: 'numeric',
+                      weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
                     })}
                   </time>
-                  <span className="order-meta">{order.total_items} items</span>
+                  <span className="order-meta">
+                    {order.meal_type_display} · {order.total_items} items
+                  </span>
                 </div>
                 <span className={`status-pill status-${order.status}`}>{order.status}</span>
               </header>

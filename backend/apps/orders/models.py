@@ -73,10 +73,12 @@ class Order(models.Model):
     
     @property
     def can_be_modified(self):
-        """Check if order can still be modified."""
+        """Orders are final once placed — no edits until the next menu."""
+        if self.order_items.exists():
+            return False
         return (
-            self.status in ['pending', 'confirmed'] and
-            self.daily_menu.is_ordering_open
+            self.status in ['pending', 'confirmed']
+            and self.daily_menu.is_ordering_open
         )
     
     @property

@@ -1,14 +1,13 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { apiRequest } from '../api/client';
-import type { TodayMenuResponse } from '../api/types';
+import type { MealType, TodayMenusResponse } from '../api/types';
+import { MEAL_LABELS, ORDER_DEADLINE } from '../api/types';
 import { EmptyState, LoadingState, PageHeader } from '../components/PageHeader';
 
+const MEALS: MealType[] = ['lunch', 'dinner'];
+
 const CATEGORY_EMOJI: Record<string, string> = {
-  main: '🍛',
-  side: '🥗',
-  dessert: '🍰',
-  drink: '🥤',
-  snack: '🥪',
+  main: '🍛', side: '🥗', dessert: '🍰', drink: '🥤', snack: '🥪', rice: '🍚', curry: '🍲', beverage: '🥤',
 };
 
 function categoryEmoji(category: string) {
@@ -16,7 +15,8 @@ function categoryEmoji(category: string) {
 }
 
 export function TodayMenuPage() {
-  const [data, setData] = useState<TodayMenuResponse | null>(null);
+  const [data, setData] = useState<TodayMenusResponse | null>(null);
+  const [activeMeal, setActiveMeal] = useState<MealType>('lunch');
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
@@ -28,14 +28,15 @@ export function TodayMenuPage() {
     setLoading(true);
     setError('');
     try {
-      const res = await apiRequest<TodayMenuResponse>('/api/orders/today/');
+      const res = await apiRequest<TodayMenusResponse>('/api/orders/today/');
       setData(res);
+      const slot = res[activeMeal];
       const initial: Record<number, number> = {};
-      res.menu?.items.forEach((item) => {
+      slot.menu?.items.forEach((item) => {
         initial[item.id] = item.quantity || 0;
       });
       setQuantities(initial);
-      setNotes(res.order?.notes ?? '');
+      setNotes(slot.order?.notes ?? '');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load menu');
     } finally {
@@ -47,6 +48,19 @@ export function TodayMenuPage() {
     load();
   }, []);
 
+  useEffect(() => {
+    if (!data) return;
+    const slot = data[activeMeal];
+    const initial: Record<number, number> = {};
+    slot.menu?.items.forEach((item) => {
+      initial[item.id] = item.quantity || 0;
+    });
+    setQuantities(initial);
+    setNotes(slot.order?.notes ?? '');
+    setError('');
+    setMessage('');
+  }, [activeMeal, data]);
+
   function adjustQty(id: number, delta: number, max: number) {
     setQuantities((prev) => ({
       ...prev,
@@ -56,7 +70,8 @@ export function TodayMenuPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!data?.menu) return;
+    const slot = data?.[activeMeal];
+    if (!slot?.menu) return;
 
     const items = Object.entries(quantities)
       .filter(([, qty]) => qty > 0)
@@ -76,9 +91,9 @@ export function TodayMenuPage() {
     try {
       await apiRequest('/api/orders/today/', {
         method: 'POST',
-        body: JSON.stringify({ items, notes }),
+        body: JSON.stringify({ meal_type: activeMeal, items, notes }),
       });
-      setMessage('Your order has been saved. Enjoy your meal!');
+      setMessage(`${MEAL_LABELS[activeMeal]} order placed!`);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save order');
@@ -87,130 +102,158 @@ export function TodayMenuPage() {
     }
   }
 
-  if (loading) return <LoadingState label="Loading today's menu…" />;
+  if (loading) return <LoadingState label="Loading menus…" />;
 
-  if (!data?.menu) {
-    return (
-      <div className="card card-elevated">
-        <PageHeader
-          eyebrow="Lunch"
-          title="Today's Menu"
-          subtitle="Check back when the kitchen publishes today's offerings."
-          icon="🍽️"
-        />
-        <EmptyState
-          icon="🥘"
-          title="No menu yet"
-          message="Today's menu hasn't been published. Check again soon!"
-        />
-      </div>
-    );
-  }
-
-  const { menu } = data;
-  const orderingOpen = menu.is_ordering_open;
+  const slot = data?.[activeMeal];
+  const menu = slot?.menu;
+  const orderingForDate = menu?.date
+    ? new Date(menu.date).toLocaleDateString('en-IN', {
+        weekday: 'long', day: 'numeric', month: 'long',
+      })
+    : new Date(Date.now() + 86400000).toLocaleDateString('en-IN', {
+        weekday: 'long', day: 'numeric', month: 'long',
+      });
+  const orderingOpen = menu?.is_ordering_open ?? false;
+  const userHasOrdered = menu?.user_has_ordered ?? Boolean(slot?.order);
   const totalSelected = Object.values(quantities).reduce((a, b) => a + b, 0);
-  const dateLabel = new Date(menu.date).toLocaleDateString('en-IN', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
+
+  function mealTabStatus(meal: MealType) {
+    const mealSlot = data?.[meal];
+    if (!mealSlot?.menu) return null;
+    if (mealSlot.menu.user_has_ordered || mealSlot.order) return 'ordered';
+    return mealSlot.menu.is_ordering_open ? 'open' : 'closed';
+  }
 
   return (
     <div className="today-page">
       <PageHeader
-        eyebrow="Lunch"
-        title="Today's Menu"
-        subtitle={dateLabel}
+        eyebrow="Order"
+        title="Order for Tomorrow"
+        subtitle={orderingForDate}
         icon="🍽️"
-      >
-        <span className={`status-pill ${orderingOpen ? 'open' : 'closed'}`}>
-          {orderingOpen ? '● Orders open' : '● Orders closed'}
-        </span>
-      </PageHeader>
+      />
 
-      <div className="card card-elevated">
-        {!orderingOpen && (
-          <div className="alert warning">
-            {menu.orders_closed_reason || 'Ordering is closed for today.'}
-          </div>
-        )}
-        {error && <div className="alert error">{error}</div>}
-        {message && <div className="alert success">{message}</div>}
-
-        <form onSubmit={handleSubmit}>
-          <div className="menu-grid">
-            {menu.items.map((item) => {
-              const qty = quantities[item.id] ?? 0;
-              return (
-                <article
-                  key={item.id}
-                  className={`menu-item-card ${qty > 0 ? 'selected' : ''}`}
-                >
-                  <div className="menu-item-icon" aria-hidden>
-                    {categoryEmoji(item.category)}
-                  </div>
-                  <div className="menu-item-body">
-                    <div className="menu-item-top">
-                      <h3>{item.name}</h3>
-                      <span className={`badge badge-${item.category}`}>{item.category}</span>
-                    </div>
-                    <p className="muted">Max {item.max_quantity_per_user} per person</p>
-                    <div className="qty-control">
-                      <button
-                        type="button"
-                        className="qty-btn"
-                        disabled={!orderingOpen || qty === 0}
-                        onClick={() => adjustQty(item.id, -1, item.max_quantity_per_user)}
-                        aria-label={`Decrease ${item.name}`}
-                      >
-                        −
-                      </button>
-                      <span className="qty-value">{qty}</span>
-                      <button
-                        type="button"
-                        className="qty-btn"
-                        disabled={!orderingOpen || qty >= item.max_quantity_per_user}
-                        onClick={() => adjustQty(item.id, 1, item.max_quantity_per_user)}
-                        aria-label={`Increase ${item.name}`}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-
-          <div className="order-footer">
-            <label className="field">
-              <span>Special notes <span className="muted">(optional)</span></span>
-              <textarea
-                value={notes}
-                disabled={!orderingOpen}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Any allergies or preferences?"
-                rows={2}
-              />
-            </label>
-
-            <div className="order-submit-row">
-              <div className="order-summary">
-                <span className="muted">Items selected</span>
-                <strong>{totalSelected}</strong>
-              </div>
-              <button
-                type="submit"
-                className="btn-primary btn-lg"
-                disabled={!orderingOpen || saving}
-              >
-                {saving ? 'Saving…' : 'Place order →'}
-              </button>
-            </div>
-          </div>
-        </form>
+      <div className="meal-tabs">
+        {MEALS.map((meal) => {
+          const tabStatus = mealTabStatus(meal);
+          return (
+            <button
+              key={meal}
+              type="button"
+              className={`meal-tab ${activeMeal === meal ? 'active' : ''}`}
+              onClick={() => setActiveMeal(meal)}
+            >
+              <span className="meal-tab-label">{MEAL_LABELS[meal]}</span>
+              <span className="meal-tab-deadline">
+                {data?.[meal]?.menu?.expires_at_display
+                  ? `Before ${data[meal].menu!.expires_at_display}`
+                  : `Before ${ORDER_DEADLINE} on menu day`}
+              </span>
+              {tabStatus && (
+                <span className={`meal-tab-status ${tabStatus}`}>
+                  {tabStatus === 'open' ? 'Open' : tabStatus === 'ordered' ? 'Ordered' : 'Closed'}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
+
+      {!menu ? (
+        <div className="card card-elevated">
+          <EmptyState
+            icon="🥘"
+            title={`No ${MEAL_LABELS[activeMeal].toLowerCase()} menu`}
+            message={`${MEAL_LABELS[activeMeal]} for ${orderingForDate} hasn't been published yet. Admin must publish it for that date.`}
+          />
+        </div>
+      ) : (
+        <div className="card card-elevated">
+          <div className="meal-deadline-banner">
+            <span className="deadline-icon">⏰</span>
+            <div>
+              <strong>{menu.ordering_deadline_message}</strong>
+              <p className="muted">
+                {orderingOpen
+                  ? (menu.expires_at_display
+                    ? `${MEAL_LABELS[activeMeal]} orders close before ${menu.expires_at_display}`
+                    : `${MEAL_LABELS[activeMeal]} orders close before ${ORDER_DEADLINE} on the menu date`)
+                  : menu.orders_closed_reason}
+              </p>
+            </div>
+            <span className={`status-pill ${orderingOpen ? 'open' : userHasOrdered ? 'ordered' : 'closed'}`}>
+              {orderingOpen ? '● Open' : userHasOrdered ? '● Ordered' : '● Closed'}
+            </span>
+          </div>
+
+          {error && <div className="alert error">{error}</div>}
+          {message && <div className="alert success">{message}</div>}
+
+          {userHasOrdered && slot?.order ? (
+            <div className="order-placed-summary">
+              <p className="alert success">
+                Your {MEAL_LABELS[activeMeal].toLowerCase()} order is confirmed. You can order again when the next menu is published.
+              </p>
+              <ul className="order-items">
+                {slot.order.order_items.map((item) => (
+                  <li key={item.id}>
+                    <span>{item.item_name}</span>
+                    <span className="qty-tag">×{item.quantity}</span>
+                  </li>
+                ))}
+              </ul>
+              {slot.order.notes && (
+                <p className="order-notes"><span>💬</span> {slot.order.notes}</p>
+              )}
+            </div>
+          ) : (
+          <form onSubmit={handleSubmit}>
+            <div className="menu-grid">
+              {menu.items.map((item) => {
+                const qty = quantities[item.id] ?? 0;
+                return (
+                  <article key={item.id} className={`menu-item-card ${qty > 0 ? 'selected' : ''}`}>
+                    <div className="menu-item-icon" aria-hidden>{categoryEmoji(item.category)}</div>
+                    <div className="menu-item-body">
+                      <div className="menu-item-top">
+                        <h3>{item.name}</h3>
+                        <span className={`badge badge-${item.category}`}>{item.category}</span>
+                      </div>
+                      <p className="muted">Max {item.max_quantity_per_user} per person</p>
+                      <div className="qty-control">
+                        <button type="button" className="qty-btn" disabled={!orderingOpen || qty === 0}
+                          onClick={() => adjustQty(item.id, -1, item.max_quantity_per_user)}>−</button>
+                        <span className="qty-value">{qty}</span>
+                        <button type="button" className="qty-btn"
+                          disabled={!orderingOpen || qty >= item.max_quantity_per_user}
+                          onClick={() => adjustQty(item.id, 1, item.max_quantity_per_user)}>+</button>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="order-footer">
+              <label className="field">
+                <span>Notes <span className="muted">(optional)</span></span>
+                <textarea value={notes} disabled={!orderingOpen} onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Any allergies or preferences?" rows={2} />
+              </label>
+              <div className="order-submit-row">
+                <div className="order-summary">
+                  <span className="muted">Items selected</span>
+                  <strong>{totalSelected}</strong>
+                </div>
+                <button type="submit" className="btn-primary btn-lg" disabled={!orderingOpen || saving}>
+                  {saving ? 'Saving…' : `Place ${MEAL_LABELS[activeMeal].toLowerCase()} order →`}
+                </button>
+              </div>
+            </div>
+          </form>
+          )}
+        </div>
+      )}
     </div>
   );
 }

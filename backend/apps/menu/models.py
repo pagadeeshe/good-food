@@ -1,7 +1,17 @@
+from datetime import datetime
+
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
-from datetime import time
+
+from .constants import (
+    DEFAULT_CUTOFF_TIME,
+    MEAL_TYPE_CHOICES,
+    ORDER_DEADLINE_DISPLAY,
+    ORDER_DEADLINE_TIME,
+    cutoff_display_for_meal,
+    cutoff_for_meal,
+)
 
 
 class WeeklyMenu(models.Model):
@@ -35,10 +45,10 @@ class WeeklyMenu(models.Model):
 
 class DailyMenu(models.Model):
     """
-    Daily menu for a specific date.
-    Users can only see and order from today's active menu.
+    Daily menu for a specific date and meal (lunch/dinner).
+    Users order today for tomorrow's menu (e.g. Sunday → Monday, Monday → Tuesday).
     """
-    
+
     STATUS_CHOICES = [
         ('draft', 'Draft'),
         ('published', 'Published'),
@@ -55,20 +65,32 @@ class DailyMenu(models.Model):
         (6, 'Sunday'),
     ]
     
-    date = models.DateField(unique=True, db_index=True)
+    date = models.DateField(db_index=True)
+    meal_type = models.CharField(
+        max_length=10,
+        choices=MEAL_TYPE_CHOICES,
+        default='lunch',
+        db_index=True,
+    )
     weekday = models.IntegerField(choices=WEEKDAY_CHOICES, editable=False)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft', db_index=True)
-    
-    # Ordering configuration
-    cutoff_time = models.TimeField(default=time(11, 0), help_text="Time until which orders can be placed")
-    
+
+    # Ordering configuration — closes at 10:00 AM on the menu date
+    cutoff_time = models.TimeField(
+        default=ORDER_DEADLINE_TIME,
+        help_text="Order deadline on the menu date",
+    )
+
+    # When the menu was published (for admin tracking)
+    published_at = models.DateTimeField(null=True, blank=True, db_index=True)
+
     # Menu metadata
     weekly_menu = models.ForeignKey(
-        WeeklyMenu, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        related_name='daily_menus'
+        WeeklyMenu,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='daily_menus',
     )
     description = models.TextField(blank=True)
     
@@ -89,49 +111,80 @@ class DailyMenu(models.Model):
             models.Index(fields=['date']),
             models.Index(fields=['status']),
             models.Index(fields=['weekday']),
+            models.Index(fields=['meal_type']),
+            models.Index(fields=['date', 'meal_type']),
         ]
-        ordering = ['-date']
-        
+        constraints = [
+            models.UniqueConstraint(
+                fields=['date', 'meal_type'],
+                name='unique_daily_menu_per_meal',
+            ),
+        ]
+        ordering = ['-date', 'meal_type']
+
     def __str__(self):
-        return f"Menu for {self.date} ({self.get_status_display()})"
-    
+        return f"{self.get_meal_type_display()} menu for {self.date} ({self.get_status_display()})"
+
     def save(self, *args, **kwargs):
-        # Auto-set weekday
         self.weekday = self.date.weekday()
+        self.cutoff_time = cutoff_for_meal(self.meal_type)
         super().save(*args, **kwargs)
-    
+
+    @property
+    def cutoff_time_display(self):
+        return cutoff_display_for_meal(self.meal_type)
+
+    @property
+    def ordering_deadline_at(self):
+        """10:00 AM on the menu date in the local timezone."""
+        if not self.date:
+            return None
+        naive = datetime.combine(self.date, ORDER_DEADLINE_TIME)
+        return timezone.make_aware(naive, timezone.get_current_timezone())
+
+    @property
+    def expires_at(self):
+        return self.ordering_deadline_at
+
+    @property
+    def expires_at_display(self):
+        deadline = self.ordering_deadline_at
+        if not deadline:
+            return None
+        local = timezone.localtime(deadline)
+        return local.strftime(f'{ORDER_DEADLINE_DISPLAY} on %A, %d %b %Y')
+
+    @property
+    def ordering_deadline_message(self):
+        if self.status != 'published':
+            return 'Menu not yet published'
+        display = self.expires_at_display
+        if display:
+            return f'Order before {display}'
+        return f'Order before {ORDER_DEADLINE_DISPLAY} on the menu date'
+
     @property
     def is_ordering_open(self):
-        """Check if ordering is still open for this menu."""
         if self.status != 'published':
             return False
-        
-        now = timezone.now()
-        today = now.date()
-        current_time = now.time()
-        
-        # Only allow orders for today's menu before cutoff time
-        return self.date == today and current_time <= self.cutoff_time
-    
+        deadline = self.ordering_deadline_at
+        if not deadline:
+            return False
+        return timezone.now() < deadline
+
     @property
     def orders_closed_reason(self):
-        """Get reason why orders are closed."""
         if self.status == 'draft':
-            return "Menu not yet published"
-        elif self.status == 'closed':
-            return "Menu closed by admin"
-        
-        now = timezone.now()
-        today = now.date()
-        current_time = now.time()
-        
-        if self.date < today:
-            return "Past date"
-        elif self.date > today:
-            return "Future date - only today's menu is available"
-        elif current_time > self.cutoff_time:
-            return f"Ordering closed at {self.cutoff_time.strftime('%H:%M')}"
-        
+            return 'Menu not yet published'
+        if self.status == 'closed':
+            return 'Menu closed by admin'
+        if self.status == 'published':
+            deadline = self.ordering_deadline_at
+            if deadline and timezone.now() >= deadline:
+                return (
+                    f'{self.get_meal_type_display()} ordering closed — '
+                    f'deadline was {self.expires_at_display}'
+                )
         return None
 
 
@@ -203,9 +256,15 @@ class MenuTemplate(models.Model):
     Useful for recurring weekly menus.
     """
     
-    name = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     weekday = models.IntegerField(choices=DailyMenu.WEEKDAY_CHOICES, db_index=True)
+    meal_type = models.CharField(
+        max_length=10,
+        choices=MEAL_TYPE_CHOICES,
+        default='lunch',
+        db_index=True,
+    )
     
     # Template metadata
     is_active = models.BooleanField(default=True)
@@ -221,12 +280,18 @@ class MenuTemplate(models.Model):
     class Meta:
         db_table = 'menu_templates'
         indexes = [
-            models.Index(fields=['weekday', 'is_active']),
+            models.Index(fields=['weekday', 'meal_type', 'is_active']),
         ]
-        ordering = ['weekday', 'name']
-        
+        constraints = [
+            models.UniqueConstraint(
+                fields=['weekday', 'meal_type'],
+                name='unique_weekday_meal_template',
+            ),
+        ]
+        ordering = ['weekday', 'meal_type', 'name']
+
     def __str__(self):
-        return f"{self.name} ({self.get_weekday_display()})"
+        return f"{self.name} ({self.get_weekday_display()} {self.get_meal_type_display()})"
 
 
 class MenuTemplateItem(models.Model):

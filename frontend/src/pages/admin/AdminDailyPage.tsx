@@ -1,32 +1,77 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
-import type { UpcomingDay } from '../../api/types';
+import type { MealType, UpcomingDay, UpcomingMenusResponse } from '../../api/types';
+import { MEAL_LABELS, ORDER_DEADLINE } from '../../api/types';
 import { LoadingState, PageHeader } from '../../components/PageHeader';
 
+const MEALS: MealType[] = ['lunch', 'dinner'];
+
 export function AdminDailyPage() {
+  const { mealType } = useParams();
+  const activeMeal: MealType = mealType === 'dinner' ? 'dinner' : 'lunch';
   const [days, setDays] = useState<UpcomingDay[]>([]);
+  const [orderingForDate, setOrderingForDate] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    apiRequest<UpcomingDay[]>('/api/admin/daily/')
-      .then(setDays)
+    apiRequest<UpcomingMenusResponse>('/api/admin/daily/')
+      .then((res) => {
+        setDays(res.days);
+        setOrderingForDate(res.ordering_for_date);
+      })
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'));
   }, []);
 
   if (error) return <div className="alert error">{error}</div>;
+
+  const filtered = days
+    .filter((d) => d.meal_type === activeMeal)
+    .sort((a, b) => {
+      if (a.is_ordering_target) return -1;
+      if (b.is_ordering_target) return 1;
+      return a.date.localeCompare(b.date);
+    });
+
+  const orderingForLabel = orderingForDate
+    ? new Date(orderingForDate).toLocaleDateString('en-IN', {
+        weekday: 'long', day: 'numeric', month: 'long',
+      })
+    : '';
 
   return (
     <div className="admin-page">
       <PageHeader
         eyebrow="Admin"
         title="Daily Menus"
-        subtitle="Upcoming menus for the next two weeks."
+        subtitle={`Employees are ordering for ${orderingForLabel || 'tomorrow'} — publish that date's menu.`}
         icon="🗓️"
       />
 
+      {orderingForDate && (
+        <div className="meal-deadline-banner" style={{ marginBottom: '1rem' }}>
+          <span className="deadline-icon">📌</span>
+          <div>
+            <strong>Active ordering date: {orderingForLabel}</strong>
+            <p className="muted">
+              Only menus published for this date appear on the order page. Publishing today&apos;s date will not show to employees.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="meal-tabs">
+        {MEALS.map((meal) => (
+          <Link key={meal} to={`/admin/daily/${meal}`}
+            className={`meal-tab ${activeMeal === meal ? 'active' : ''}`}>
+            <span className="meal-tab-label">{MEAL_LABELS[meal]}</span>
+            <span className="meal-tab-deadline">Closes {ORDER_DEADLINE}</span>
+          </Link>
+        ))}
+      </div>
+
       <div className="card card-elevated table-card">
-        {!days.length ? (
+        {!filtered.length ? (
           <LoadingState label="Loading menus…" />
         ) : (
           <table className="data-table">
@@ -41,13 +86,18 @@ export function AdminDailyPage() {
               </tr>
             </thead>
             <tbody>
-              {days.map((day) => {
-                const d = new Date(day.date);
-                const path = `/admin/daily/${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+              {filtered.map((day) => {
+                const d = new Date(day.date + 'T12:00:00');
+                const path = `/admin/daily/${activeMeal}/${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
                 return (
-                  <tr key={day.date}>
+                  <tr key={`${day.date}-${day.meal_type}`} className={day.is_ordering_target ? 'row-highlight' : ''}>
                     <td>{d.toLocaleDateString()}</td>
-                    <td>{day.day_name}</td>
+                    <td>
+                      {day.day_name}
+                      {day.is_ordering_target && (
+                        <span className="status-pill open" style={{ marginLeft: '0.5rem' }}>Ordering now</span>
+                      )}
+                    </td>
                     <td><span className="qty-tag">{day.item_count}</span></td>
                     <td>
                       <span className={`status-pill status-${day.daily_menu?.status ?? 'draft'}`}>
@@ -55,7 +105,7 @@ export function AdminDailyPage() {
                       </span>
                     </td>
                     <td>{day.source}</td>
-                    <td><Link to={path} className="table-link">Edit →</Link></td>
+                    <td><Link to={path} className="table-link">{day.is_ordering_target ? 'Edit & publish →' : 'Edit →'}</Link></td>
                   </tr>
                 );
               })}
@@ -70,19 +120,28 @@ export function AdminDailyPage() {
 interface DailyDetail {
   menu_date: string;
   day_name: string;
-  daily_menu: { id: number; status: string } | null;
+  meal_type: MealType;
+  daily_menu: {
+    id: number;
+    status: string;
+    expires_at_display: string | null;
+    ordering_deadline_message: string;
+  } | null;
   custom_items: { id: number; name: string; category: string }[];
   standard_items: { name: string; category: string }[];
   using_standard: boolean;
 }
 
-export function AdminDailyEditPage({ year, month, day }: { year: string; month: string; day: string }) {
+export function AdminDailyEditPage({
+  mealType, year, month, day,
+}: { mealType: string; year: string; month: string; day: string }) {
+  const meal: MealType = mealType === 'dinner' ? 'dinner' : 'lunch';
   const [detail, setDetail] = useState<DailyDetail | null>(null);
   const [newItem, setNewItem] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  const path = `/api/admin/daily/${year}/${month}/${day}/`;
+  const path = `/api/admin/daily/${year}/${month}/${day}/${meal}/`;
 
   async function load() {
     const data = await apiRequest<DailyDetail>(path);
@@ -91,7 +150,7 @@ export function AdminDailyEditPage({ year, month, day }: { year: string; month: 
 
   useEffect(() => {
     load().catch((err) => setError(err instanceof Error ? err.message : 'Failed to load'));
-  }, [year, month, day]);
+  }, [year, month, day, meal]);
 
   async function action(body: Record<string, unknown>) {
     setError('');
@@ -116,15 +175,13 @@ export function AdminDailyEditPage({ year, month, day }: { year: string; month: 
   if (!detail) return <LoadingState label="Loading menu…" />;
 
   const dateLabel = new Date(detail.menu_date).toLocaleDateString('en-IN', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
+    weekday: 'long', day: 'numeric', month: 'long',
   });
 
   return (
     <div className="admin-page">
       <PageHeader
-        eyebrow="Edit menu"
+        eyebrow={`${MEAL_LABELS[meal]} menu`}
         title={detail.day_name}
         subtitle={dateLabel}
         icon="✏️"
@@ -134,20 +191,27 @@ export function AdminDailyEditPage({ year, month, day }: { year: string; month: 
         </span>
       </PageHeader>
 
+      <div className="meal-deadline-banner">
+        <span className="deadline-icon">⏰</span>
+        <div>
+          <strong>
+            {detail.daily_menu?.ordering_deadline_message
+              ?? `Orders close at ${ORDER_DEADLINE} on the menu date`}
+          </strong>
+          <p className="muted">
+            Employees order today for this menu date. On Sunday they see Monday&apos;s menu; orders close Monday at 10:00 AM.
+          </p>
+        </div>
+      </div>
+
       <div className="card card-elevated">
         {error && <div className="alert error">{error}</div>}
         {message && <div className="alert success">{message}</div>}
 
         <div className="actions">
-          <button type="button" className="btn-primary" onClick={() => action({ action: 'publish' })}>
-            Publish
-          </button>
-          <button type="button" className="btn-secondary" onClick={() => action({ action: 'unpublish' })}>
-            Unpublish
-          </button>
-          <button type="button" className="btn-secondary" onClick={() => action({ action: 'reset_to_standard' })}>
-            Reset to standard
-          </button>
+          <button type="button" className="btn-primary" onClick={() => action({ action: 'publish' })}>Publish</button>
+          <button type="button" className="btn-secondary" onClick={() => action({ action: 'unpublish' })}>Unpublish</button>
+          <button type="button" className="btn-secondary" onClick={() => action({ action: 'reset_to_standard' })}>Reset to standard</button>
         </div>
 
         <h3 className="section-title">Custom items</h3>
@@ -158,13 +222,8 @@ export function AdminDailyEditPage({ year, month, day }: { year: string; month: 
             {detail.custom_items.map((item) => (
               <li key={item.id} className="item-row-between">
                 <span>{item.name}</span>
-                <button
-                  type="button"
-                  className="btn-danger"
-                  onClick={() => action({ action: 'delete_item', item_id: item.id })}
-                >
-                  Remove
-                </button>
+                <button type="button" className="btn-danger"
+                  onClick={() => action({ action: 'delete_item', item_id: item.id })}>Remove</button>
               </li>
             ))}
           </ul>

@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from django.utils import timezone
 from django.core.cache import cache
+
+from .constants import ORDER_DEADLINE_DISPLAY
 from .models import WeeklyMenu, DailyMenu, MenuItem, MenuTemplate, MenuTemplateItem
 
 
@@ -39,18 +41,36 @@ class DailyMenuSerializer(serializers.ModelSerializer):
     """
     menu_items = MenuItemSerializer(many=True, read_only=True)
     weekday_name = serializers.CharField(source='get_weekday_display', read_only=True)
+    meal_type_display = serializers.CharField(source='get_meal_type_display', read_only=True)
+    cutoff_time_display = serializers.CharField(read_only=True)
+    published_at = serializers.SerializerMethodField()
+    expires_at = serializers.SerializerMethodField()
+    expires_at_display = serializers.CharField(read_only=True)
+    order_deadline_display = serializers.SerializerMethodField()
+    ordering_deadline_message = serializers.CharField(read_only=True)
     is_ordering_open = serializers.BooleanField(read_only=True)
     orders_closed_reason = serializers.CharField(read_only=True)
-    
+
     class Meta:
         model = DailyMenu
         fields = [
-            'id', 'date', 'weekday', 'weekday_name', 'status', 
-            'cutoff_time', 'description', 'total_orders', 
-            'total_items_ordered', 'is_ordering_open', 
-            'orders_closed_reason', 'menu_items', 'created_at'
+            'id', 'date', 'meal_type', 'meal_type_display', 'weekday', 'weekday_name',
+            'status', 'cutoff_time', 'cutoff_time_display', 'published_at', 'expires_at',
+            'expires_at_display', 'order_deadline_display', 'ordering_deadline_message',
+            'description', 'total_orders', 'total_items_ordered', 'is_ordering_open',
+            'orders_closed_reason', 'menu_items', 'created_at',
         ]
         read_only_fields = ['weekday', 'total_orders', 'total_items_ordered']
+
+    def get_published_at(self, obj):
+        return obj.published_at.isoformat() if obj.published_at else None
+
+    def get_expires_at(self, obj):
+        value = obj.ordering_deadline_at
+        return value.isoformat() if value else None
+
+    def get_order_deadline_display(self, obj):
+        return ORDER_DEADLINE_DISPLAY
 
 
 class DailyMenuCreateSerializer(serializers.ModelSerializer):
@@ -152,9 +172,9 @@ class MenuTemplateSerializer(serializers.ModelSerializer):
     class Meta:
         model = MenuTemplate
         fields = [
-            'id', 'name', 'description', 'weekday', 'weekday_name',
-            'is_active', 'usage_count', 'created_by_name', 
-            'template_items', 'created_at'
+            'id', 'name', 'description', 'weekday', 'weekday_name', 'meal_type',
+            'is_active', 'usage_count', 'created_by_name',
+            'template_items', 'created_at',
         ]
 
 

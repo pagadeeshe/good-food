@@ -237,19 +237,17 @@ def finalize_daily_menu_reports(self):
         from .models import DailyMenu, DailyOrderReport
         
         now = timezone.now()
-        today = now.date()
-        current_time = now.time()
-        
-        # Find menus whose cutoff time has passed
+
         menus_to_finalize = DailyMenu.objects.filter(
-            date=today,
             status='published',
-            cutoff_time__lt=current_time,
-            order_report__is_finalized=False
+            order_report__is_finalized=False,
         )
-        
+
         finalized_count = 0
         for menu in menus_to_finalize:
+            deadline = menu.ordering_deadline_at
+            if not deadline or now < deadline:
+                continue
             try:
                 report = menu.order_report
                 report.finalize_report()

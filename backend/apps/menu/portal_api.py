@@ -1,4 +1,4 @@
-"""Admin portal REST endpoints (replaces HTML admin views)."""
+"""Admin portal REST endpoints."""
 
 from datetime import date
 
@@ -9,6 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 
 from apps.authentication.permissions import IsPortalAdmin
+from apps.menu.constants import MEAL_DINNER, MEAL_LUNCH, MEAL_TYPES, is_valid_meal_type
 from apps.orders.services import get_daily_order_totals
 
 from .models import DailyMenu, MenuItem, MenuTemplate, MenuTemplateItem
@@ -18,12 +19,21 @@ from .services import (
     apply_standard_menu,
     daily_menu_for_date,
     ensure_weekly_templates,
+    get_ordering_target_date,
     get_weekday_template,
     menu_preview_for_date,
+    publish_daily_menu,
     seed_sample_weekly_menus,
     template_items_list,
+    unpublish_daily_menu,
     upcoming_dates,
 )
+
+
+def _validate_meal(meal_type):
+    if not is_valid_meal_type(meal_type):
+        return Response({'error': 'Invalid meal type. Use lunch or dinner.'}, status=400)
+    return None
 
 
 @api_view(['GET'])
@@ -32,16 +42,20 @@ def admin_dashboard(request):
     ensure_weekly_templates(request.user)
     seed_sample_weekly_menus(request.user)
     today = timezone.localdate()
-    today_menu, today_items, source = menu_preview_for_date(today)
+    ordering_for = get_ordering_target_date()
+    menus = {}
+    for meal_type in MEAL_TYPES:
+        daily, items, source = menu_preview_for_date(ordering_for, meal_type)
+        menus[meal_type] = {
+            'daily_menu': DailyMenuSerializer(daily).data if daily else None,
+            'items': [{'name': i.name, 'category': getattr(i, 'category', 'main')} for i in items],
+            'source': source,
+            'order_totals': get_daily_order_totals(ordering_for, meal_type=meal_type),
+        }
     return Response({
         'today': today,
-        'today_menu': DailyMenuSerializer(today_menu).data if today_menu else None,
-        'today_items': [
-            {'name': i.name, 'category': getattr(i, 'category', 'main')}
-            for i in today_items
-        ],
-        'today_source': source,
-        'order_totals': get_daily_order_totals(today),
+        'ordering_for_date': ordering_for,
+        'menus': menus,
         'weekday_count': MenuTemplate.objects.filter(is_active=True).count(),
     })
 
@@ -52,25 +66,30 @@ def weekly_templates(request):
     ensure_weekly_templates(request.user)
     data = []
     for weekday, day_name in WEEKDAYS:
-        template = get_weekday_template(weekday)
-        items = template_items_list(template)
-        data.append({
-            'weekday': weekday,
-            'day_name': day_name,
-            'template': MenuTemplateSerializer(template).data if template else None,
-            'item_count': len(items),
-        })
+        for meal_type in MEAL_TYPES:
+            template = get_weekday_template(weekday, meal_type)
+            items = template_items_list(template)
+            data.append({
+                'weekday': weekday,
+                'day_name': day_name,
+                'meal_type': meal_type,
+                'template': MenuTemplateSerializer(template).data if template else None,
+                'item_count': len(items),
+            })
     return Response(data)
 
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsPortalAdmin])
-def weekday_template_detail(request, weekday):
+def weekday_template_detail(request, weekday, meal_type):
+    err = _validate_meal(meal_type)
+    if err:
+        return err
     if weekday < 0 or weekday > 6:
         return Response({'error': 'Invalid weekday'}, status=status.HTTP_400_BAD_REQUEST)
 
     ensure_weekly_templates(request.user)
-    template = get_object_or_404(MenuTemplate, weekday=weekday, is_active=True)
+    template = get_object_or_404(MenuTemplate, weekday=weekday, meal_type=meal_type, is_active=True)
 
     if request.method == 'GET':
         return Response(MenuTemplateSerializer(template).data)
@@ -103,33 +122,46 @@ def weekday_template_detail(request, weekday):
 @permission_classes([IsPortalAdmin])
 def upcoming_daily_menus(request):
     ensure_weekly_templates(request.user)
+    ordering_for = get_ordering_target_date()
     days = []
     for menu_date in upcoming_dates(14):
-        daily, items, source = menu_preview_for_date(menu_date)
-        days.append({
-            'date': menu_date,
-            'day_name': menu_date.strftime('%A'),
-            'daily_menu': DailyMenuSerializer(daily).data if daily else None,
-            'item_count': len(items),
-            'source': source,
-        })
-    return Response(days)
+        for meal_type in MEAL_TYPES:
+            daily, items, source = menu_preview_for_date(menu_date, meal_type)
+            days.append({
+                'date': menu_date,
+                'day_name': menu_date.strftime('%A'),
+                'meal_type': meal_type,
+                'daily_menu': DailyMenuSerializer(daily).data if daily else None,
+                'item_count': len(items),
+                'source': source,
+                'is_ordering_target': menu_date == ordering_for,
+            })
+    return Response({
+        'ordering_for_date': ordering_for,
+        'days': days,
+    })
 
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsPortalAdmin])
-def daily_menu_detail(request, year, month, day):
+def daily_menu_detail(request, year, month, day, meal_type):
+    err = _validate_meal(meal_type)
+    if err:
+        return err
+
     menu_date = date(year, month, day)
     day_name = menu_date.strftime('%A')
+    meal_label = 'Lunch' if meal_type == MEAL_LUNCH else 'Dinner'
 
     if request.method == 'GET':
-        daily_menu = daily_menu_for_date(menu_date)
+        daily_menu = daily_menu_for_date(menu_date, meal_type)
         custom_items = list(daily_menu.menu_items.order_by('sort_order', 'name')) if daily_menu else []
-        template = get_weekday_template(menu_date.weekday())
+        template = get_weekday_template(menu_date.weekday(), meal_type)
         standard_items = template_items_list(template)
         return Response({
             'menu_date': menu_date,
             'day_name': day_name,
+            'meal_type': meal_type,
             'daily_menu': DailyMenuSerializer(daily_menu).data if daily_menu else None,
             'custom_items': [
                 {'id': i.id, 'name': i.name, 'category': i.category, 'sort_order': i.sort_order}
@@ -143,17 +175,20 @@ def daily_menu_detail(request, year, month, day):
         })
 
     action = request.data.get('action')
-    daily_menu = daily_menu_for_date(menu_date)
-    template = get_weekday_template(menu_date.weekday())
+    daily_menu = daily_menu_for_date(menu_date, meal_type)
+    template = get_weekday_template(menu_date.weekday(), meal_type)
     standard_items = template_items_list(template)
 
     if action == 'add_item':
         if not daily_menu:
-            daily_menu, err = apply_standard_menu(menu_date, request.user, publish=False)
-            if err and not daily_menu:
+            daily_menu, err_msg = apply_standard_menu(menu_date, request.user, meal_type, publish=False)
+            if err_msg and not daily_menu:
                 daily_menu = DailyMenu.objects.create(
-                    date=menu_date, created_by=request.user, status='draft',
-                    description=f'Custom menu for {day_name}',
+                    date=menu_date,
+                    meal_type=meal_type,
+                    created_by=request.user,
+                    status='draft',
+                    description=f'Custom {meal_label} menu for {day_name}',
                 )
         name = (request.data.get('name') or '').strip()
         if name:
@@ -172,32 +207,33 @@ def daily_menu_detail(request, year, month, day):
 
     elif action == 'publish':
         if not daily_menu:
-            daily_menu, err = apply_standard_menu(menu_date, request.user, publish=True)
-            if err:
-                return Response({'error': err}, status=status.HTTP_400_BAD_REQUEST)
+            daily_menu, err_msg = apply_standard_menu(menu_date, request.user, meal_type, publish=True)
+            if err_msg:
+                return Response({'error': err_msg}, status=status.HTTP_400_BAD_REQUEST)
         else:
             if not daily_menu.menu_items.exists() and not standard_items:
                 return Response({'error': 'No menu items to publish.'}, status=status.HTTP_400_BAD_REQUEST)
-            daily_menu.status = 'published'
-            daily_menu.save(update_fields=['status', 'updated_at'])
+            if not daily_menu.menu_items.exists() and standard_items:
+                from .services import copy_template_items_to_daily_menu
+                copy_template_items_to_daily_menu(template, daily_menu)
+            publish_daily_menu(daily_menu)
 
     elif action == 'unpublish':
         if daily_menu:
-            daily_menu.status = 'draft'
-            daily_menu.save(update_fields=['status', 'updated_at'])
+            unpublish_daily_menu(daily_menu)
 
     elif action == 'reset_to_standard':
         if template and template.template_items.exists():
             if not daily_menu:
-                daily_menu, _ = apply_standard_menu(menu_date, request.user, publish=False)
+                daily_menu, _ = apply_standard_menu(menu_date, request.user, meal_type, publish=False)
             else:
                 from .services import copy_template_items_to_daily_menu
                 copy_template_items_to_daily_menu(template, daily_menu)
-                daily_menu.description = f'Standard {day_name} menu'
-                daily_menu.status = 'draft'
-                daily_menu.save(update_fields=['description', 'status', 'updated_at'])
+                daily_menu.description = f'Standard {meal_label} — {day_name}'
+                daily_menu.save(update_fields=['description', 'updated_at'])
+                unpublish_daily_menu(daily_menu)
 
-    daily_menu = daily_menu_for_date(menu_date)
+    daily_menu = daily_menu_for_date(menu_date, meal_type)
     return Response({
         'daily_menu': DailyMenuSerializer(daily_menu).data if daily_menu else None,
         'message': f'Action {action} completed',
