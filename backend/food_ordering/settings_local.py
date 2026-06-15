@@ -89,7 +89,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.authentication.authentication.CookieJWTAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -105,9 +105,18 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+# HttpOnly JWT cookies (Secure=False for local http://)
+JWT_ACCESS_COOKIE_NAME = 'access_token'
+JWT_ACCESS_COOKIE_PATH = '/api/'
+JWT_REFRESH_COOKIE_NAME = 'refresh_token'
+JWT_REFRESH_COOKIE_PATH = '/api/auth/'
+JWT_COOKIE_SECURE = False
+JWT_COOKIE_SAMESITE = 'Lax'
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',

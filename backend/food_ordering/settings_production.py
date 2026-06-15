@@ -120,7 +120,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # DRF + JWT for React (Vercel)
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.authentication.authentication.CookieJWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -145,11 +145,20 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
+
+# HttpOnly JWT cookies (cross-origin: Vercel → Railway)
+JWT_ACCESS_COOKIE_NAME = 'access_token'
+JWT_ACCESS_COOKIE_PATH = '/api/'
+JWT_REFRESH_COOKIE_NAME = 'refresh_token'
+JWT_REFRESH_COOKIE_PATH = '/api/auth/'
+JWT_COOKIE_SECURE = True
+JWT_COOKIE_SAMESITE = 'None'
 
 # Vercel frontend
 CORS_ALLOWED_ORIGINS = config(

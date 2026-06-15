@@ -1,4 +1,4 @@
-import type { AuthResponse } from './types';
+import type { AuthResponse, User } from './types';
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '';
 
@@ -13,37 +13,14 @@ class ApiError extends Error {
   }
 }
 
-function getTokens() {
-  const access = localStorage.getItem('access_token');
-  const refresh = localStorage.getItem('refresh_token');
-  return { access, refresh };
-}
-
-export function setTokens(access: string, refresh: string) {
-  localStorage.setItem('access_token', access);
-  localStorage.setItem('refresh_token', refresh);
-}
-
-export function clearTokens() {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('user');
-}
-
-async function refreshAccessToken(): Promise<string | null> {
-  const { refresh } = getTokens();
-  if (!refresh) return null;
-
+async function refreshAccessToken(): Promise<boolean> {
   const res = await fetch(`${API_BASE}/api/auth/token/refresh/`, {
     method: 'POST',
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh }),
+    body: JSON.stringify({}),
   });
-
-  if (!res.ok) return null;
-  const data = await res.json();
-  localStorage.setItem('access_token', data.access);
-  return data.access as string;
+  return res.ok;
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -52,18 +29,20 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     ...(options.headers as Record<string, string> | undefined),
   };
 
-  if (options.auth !== false) {
-    const { access } = getTokens();
-    if (access) headers.Authorization = `Bearer ${access}`;
-  }
-
-  let response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  let response = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers,
+    credentials: 'include',
+  });
 
   if (response.status === 401 && options.auth !== false) {
-    const newAccess = await refreshAccessToken();
-    if (newAccess) {
-      headers.Authorization = `Bearer ${newAccess}`;
-      response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      response = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        headers,
+        credentials: 'include',
+      });
     }
   }
 
@@ -82,27 +61,31 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return response.json() as Promise<T>;
 }
 
+export async function fetchCurrentUser(): Promise<User | null> {
+  try {
+    return await apiRequest<User>('/api/auth/profile/');
+  } catch {
+    return null;
+  }
+}
+
 export async function login(email: string, password: string): Promise<AuthResponse> {
   const data = await apiRequest<AuthResponse>('/api/auth/login/', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
     auth: false,
   });
-  setTokens(data.access, data.refresh);
-  localStorage.setItem('user', JSON.stringify(data.user));
   return data;
 }
 
 export async function logout() {
-  const { refresh } = getTokens();
   try {
-    if (refresh) {
-      await apiRequest('/api/auth/logout/', {
-        method: 'POST',
-        body: JSON.stringify({ refresh_token: refresh }),
-      });
-    }
-  } finally {
-    clearTokens();
+    await apiRequest('/api/auth/logout/', {
+      method: 'POST',
+      body: JSON.stringify({}),
+      auth: false,
+    });
+  } catch {
+    // Clear client state even if logout request fails.
   }
 }

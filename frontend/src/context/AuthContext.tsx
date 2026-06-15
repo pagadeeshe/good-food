@@ -1,9 +1,11 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
-import { login as apiLogin, logout as apiLogout } from '../api/client';
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { fetchCurrentUser, login as apiLogin, logout as apiLogout } from '../api/client';
 import type { User } from '../api/types';
+import { LoadingState } from '../components/PageHeader';
 
 interface AuthContextValue {
   user: User | null;
+  loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isAdmin: boolean;
@@ -11,21 +13,19 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function loadUser(): User | null {
-  const raw = localStorage.getItem('user');
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as User;
-  } catch {
-    return null;
-  }
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(loadUser);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchCurrentUser()
+      .then(setUser)
+      .finally(() => setLoading(false));
+  }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
     user,
+    loading,
     isAdmin: Boolean(user?.is_portal_admin),
     async login(email, password) {
       const data = await apiLogin(email, password);
@@ -35,7 +35,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiLogout();
       setUser(null);
     },
-  }), [user]);
+  }), [user, loading]);
+
+  if (loading) {
+    return <LoadingState label="Loading…" />;
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
